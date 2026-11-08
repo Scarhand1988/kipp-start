@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kipp-Start">
+<meta name="theme-color" content="#101418">
+<meta name="description" content="Dein Foto im Vollbild, das sich beim Kippen des iPhones sanft bewegt, weich wird und dunkler zurücktritt.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>Kipp-Start fürs iPhone</title>
+<style>
+  :root { color-scheme: dark; --accent: #A5DAD2; --bg: #101418; --text: #EEF2F1; --muted: #A8B3B1; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  [hidden] { display: none !important; }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  button, .button { font: inherit; border: 0; border-radius: 14px; padding: 13px 18px; cursor: pointer;
+    background: var(--accent); color: #0d2420; font-weight: 600; text-decoration: none; display: inline-block; text-align: center; }
+  .ghost { background: rgba(255,255,255,.12); color: var(--text); }
+  a { color: var(--accent); }
+
+  #welcome { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    padding: calc(env(safe-area-inset-top) + 24px) 28px calc(env(safe-area-inset-bottom) + 24px);
+    background: radial-gradient(120% 80% at 50% 0%, #1d3a41 0%, var(--bg) 70%); overflow-y: auto; }
+  #welcome img { width: 84px; height: 84px; border-radius: 20px; margin-bottom: 18px; }
+  #welcome h1 { margin: 0 0 8px; font-size: 32px; }
+  #welcome p { margin: 0 0 18px; color: var(--muted); }
+  #welcome .lead { color: var(--text); font-size: 18px; }
+  #welcome button { width: 100%; margin: 8px 0 18px; font-size: 18px; }
+  .card { background: rgba(255,255,255,.07); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+  .card b { color: var(--text); }
+
+  #motion { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 18px;
+    padding: 16px 26px; box-shadow: 0 10px 30px rgba(0,0,0,.45); white-space: nowrap; }
+
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 24px);
+    max-width: calc(100% - 40px); background: rgba(16,20,24,.86); padding: 10px 16px; border-radius: 12px;
+    font-size: 14px; text-align: center; pointer-events: none; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+
+  #sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 82%; overflow-y: auto;
+    padding: 18px 20px calc(env(safe-area-inset-bottom) + 18px); border-radius: 22px 22px 0 0;
+    background: rgba(18,24,28,.82); -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
+    transform: translateY(100%); transition: transform .22s ease-out; }
+  #sheet.open { transform: translateY(0); }
+  #sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #sheet h2 { margin: 0; font-size: 20px; }
+  #closeSheet { padding: 8px 14px; }
+  .row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .row button { flex: 1; }
+  label.switch { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.08); }
+  label.switch span { flex: 1; }
+  label.switch small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 51px; height: 31px; border-radius: 16px;
+    background: rgba(255,255,255,.2); position: relative; flex: none; margin: 0; transition: background .15s; }
+  input[type=checkbox]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px;
+    border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+  input[type=checkbox]:checked { background: var(--accent); }
+  input[type=checkbox]:checked::after { transform: translateX(20px); }
+  .slider { padding: 4px 0 12px; }
+  .slider input { width: 100%; accent-color: var(--accent); }
+  .note { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+  #version { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  #adjustHint { position: fixed; left: 16px; right: 16px; top: calc(env(safe-area-inset-top) + 14px); text-align: center;
+    background: rgba(16,20,24,.8); padding: 10px 14px; border-radius: 12px; font-size: 14px; pointer-events: none; }
+  #adjustBar { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 18px); display: flex; gap: 10px; }
+  #adjustBar button { flex: 1; }
+  #adjustBar .ghost { background: rgba(16,20,24,.78); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Dein Foto mit Kippeffekt. Antippen öffnet die Einstellungen."></canvas>
+
+<section id="welcome" hidden>
+  <img src="icons/icon-180.png" alt="">
+  <h1>Kipp-Start</h1>
+  <p class="lead">Dein Foto im Vollbild. Kippst du das iPhone, bewegt es sich sanft mit, wird zur Seite hin weich und tritt dunkler zurück.</p>
+  <button id="pick">Foto auswählen</button>
+  <div class="card install-hint" hidden><b>Als App auf den Home-Bildschirm:</b> In Safari auf <b>Teilen</b> tippen, dann <b>„Zum Home-Bildschirm“</b>. Ist „Als Web-App öffnen“ zu sehen, eingeschaltet lassen.</div>
+  <div class="card android-hint" hidden><b>Android?</b> Dort gibt es die volle App mit Live-Hintergrund und eigenem Startbildschirm: <a class="android-link" href="#">Kipp-Start.apk herunterladen</a></div>
+  <div class="card">Auf dem iPhone wirkt der Effekt nur in dieser App. Als Hintergrund oder Startbildschirm erlaubt iOS das nicht.</div>
+  <p class="note">Dein Foto bleibt auf deinem Gerät. Kein Konto, keine Werbung, keine Analyse.</p>
+</section>
+
+<button id="motion" hidden>Kippen aktivieren</button>
+
+<div id="adjustHint" hidden>Mit einem Finger verschieben, mit zwei Fingern zoomen.</div>
+<div id="adjustBar" hidden>
+  <button id="adjustReset" class="ghost">Zurücksetzen</button>
+  <button id="adjustDone">Fertig</button>
+</div>
+
+<section id="sheet" hidden aria-label="Einstellungen">
+  <header><h2>Kipp-Start</h2><button id="closeSheet" class="ghost">Schließen</button></header>
+  <div class="row">
+    <button id="pickAgain" class="ghost">Anderes Foto</button>
+    <button id="adjust" class="ghost">Bildausschnitt</button>
+  </div>
+  <div class="slider">
+    <div id="blurLabel">Unschärfe beim Kippen: 70 %</div>
+    <input id="blurSlider" type="range" min="0" max="100" step="1" value="70" aria-label="Unschärfe beim Kippen">
+    <small class="note">Ganz links = aus.</small>
+  </div>
+  <label class="switch"><span>Kipp-Effekt<small>Aus: Das Bild steht still und scharf.</small></span><input id="tEnabled" type="checkbox" role="switch"></label>
+  <label class="switch"><span>Unschärfe bleibt, solange geneigt<small>An: Das Bild bleibt unscharf, bis du in die Haltung vom Öffnen zurückkippst. Aus: Es wird nach etwa einer Sekunde wieder scharf.</small></span><input id="tHold" type="checkbox" role="switch"></label>
+  <label class="switch"><span>Farben verblassen beim Kippen<small>Beim Neigen tritt das Bild dunkel und farblos zurück.</small></span><input id="tFrost" type="checkbox" role="switch"></label>
+  <label class="switch"><span>Animation beim Öffnen<small>Das Bild hebt sich in seine Ruhelage und wird dabei scharf.</small></span><input id="tUnlock" type="checkbox" role="switch"></label>
+  <div class="card install-hint" hidden><b>Als App auf den Home-Bildschirm:</b> In Safari auf <b>Teilen</b> tippen, dann <b>„Zum Home-Bildschirm“</b>.</div>
+  <p class="note">Auf dem iPhone wirkt der Effekt nur in dieser App. Auf Android gibt es die volle App mit Live-Hintergrund und Startbildschirm: <a class="android-link" href="#">Kipp-Start.apk</a></p>
+  <p class="note">Quellcode und Anleitung: <a href="https://github.com/Scarhand1988/kipp-start">github.com/Scarhand1988/kipp-start</a> · MIT-Lizenz</p>
+  <div id="version"></div>
+</section>
+
+<div id="toast" role="status" hidden></div>
+<input id="file" type="file" accept="image/*" hidden>
+
+<script src="kipp-math.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
