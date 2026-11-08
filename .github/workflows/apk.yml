@@ -3,6 +3,12 @@ name: APK bauen
 on:
   push:
     branches: [main]
+    # Nur die iPhone-Web-App oder Texte geändert: kein neuer Android-Bau (die Web-App hat ihren eigenen Workflow)
+    paths-ignore:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+      - 'README.md'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 permissions:

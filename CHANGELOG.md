@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## iPhone-Web-App 1.0
+
+- Neue Web-App fürs iPhone im Ordner `web/`, veröffentlicht über GitHub Pages: https://scarhand1988.github.io/kipp-start/
+- Rechenlogik 1:1 aus der Android-App übertragen (`web/kipp-math.js`: MotionMath, TiltTracker, SoftFocus, Effects, DrawMath). Die Lage kommt aus dem Browser-Ereignis `deviceorientation` und wird in dieselbe Quaternion-Form wie der Android-Rotationsvektor umgerechnet.
+- Effekte wie auf Android: Mitbewegen beim Kippen, Unschärfe-Verlauf zur Seite, die zum Betrachter kommt, Farben verblassen, „Unschärfe bleibt“, Animation beim Öffnen (statt beim Entsperren). Bildausschnitt mit Finger und zwei Fingern.
+- `web/tests/check.mjs` vergleicht 2.320 Werte mit Referenzwerten, die der Workflow bei jedem Lauf frisch aus den Android-Klassen erzeugt (`web/tests/Golden.java`); der Weichzeichner stimmt Byte für Byte.
+- Der Android-Bau (`apk.yml`) läuft nicht mehr bei Änderungen, die nur `web/`, README oder Änderungsverlauf betreffen.
+
 ## 0.14 – erste öffentliche Version
 
 - Veröffentlichung als Open Source unter der MIT-Lizenz in diesem Repo.
