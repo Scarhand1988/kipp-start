@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kipp-Hintergrund</string>
+    <string name="tile_name">Kipp-Effekt</string>
+    <string name="launcher_name">Kipp-Start</string>
+    <string name="wallpaper_description">Dein Foto bewegt sich sanft, wenn du das Handy kippst.</string>
+    <style name="AppTheme" parent="android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:colorAccent">#A5DAD2</item>
+        <item name="android:windowBackground">#101418</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <!-- Eigener Startbildschirm: durchsichtig, zeigt den Kipp-Hintergrund dahinter -->
+    <style name="LauncherTheme" parent="android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">#A5DAD2</item>
+    </style>
+</resources>

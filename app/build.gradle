@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Signierschlüssel kommt aus den GitHub-Secrets (KIPP_KEYSTORE_B64, KIPP_KEYSTORE_PASSWORD), nicht mehr aus dem Repo.
+// Der Bau-Ablauf legt ihn nur für die Dauer des Baus ab und setzt KIPP_KEYSTORE auf den Pfad.
+def keystorePath = System.getenv('KIPP_KEYSTORE')
+def keystorePassword = System.getenv('KIPP_KEYSTORE_PASSWORD')
+def signed = keystorePath != null && keystorePassword != null
+// Versionsnummer steigt mit jedem Bau automatisch (GitHub-Laufnummer); 1000 + Lauf liegt sicher über 9 aus 0.10
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '0').toInteger()
+
+android {
+    namespace 'de.auria.kipphintergrund'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'de.auria.kipphintergrund'
+        minSdk 31
+        targetSdk 35
+        versionCode 1000 + runNumber
+        versionName project.property('kippVersion')
+    }
+
+    // Fester Schlüssel, damit sich spätere Versionen über die alte installieren lassen
+    signingConfigs {
+        fest {
+            if (signed) {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias 'kipp'
+                keyPassword keystorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            if (signed) signingConfig signingConfigs.fest
+        }
+        release {
+            minifyEnabled false
+            if (signed) signingConfig signingConfigs.fest
+        }
+    }
+
+    lint {
+        // Android-Prüfung läuft bei jedem Bau; der Bericht hängt am Bau. Sie bricht den Bau (noch) nicht ab.
+        checkReleaseBuilds true
+        abortOnError false
+        htmlReport true
+        xmlReport true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

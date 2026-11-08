@@ -1,0 +1,116 @@
+name: APK bauen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # SHA-256 des Signier-Zertifikats von Kipp-Start (Schlüssel seit der ersten öffentlichen Version). Weicht die fertige APK ab, bricht der Bau ab,
+      # weil sich das Update dann nicht über die installierte Version legen ließe.
+      KIPP_CERT_SHA256: 67e195351e58dd08769a8466c7be823fd67f656e401ba9059866753d343622cc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Bewegungs-, Zeichen- und Launcher-Logik prüfen (MotionCheck, DrawCheck, LauncherCheck)
+        run: |
+          mkdir -p build/checks
+          javac -encoding UTF-8 -d build/checks \
+            app/src/main/java/de/auria/kipphintergrund/MotionMath.java \
+            app/src/main/java/de/auria/kipphintergrund/TiltTracker.java \
+            app/src/main/java/de/auria/kipphintergrund/SoftFocus.java \
+            app/src/main/java/de/auria/kipphintergrund/Effects.java \
+            app/src/main/java/de/auria/kipphintergrund/DrawMath.java \
+            app/src/main/java/de/auria/kipphintergrund/LauncherMath.java \
+            checks/MotionCheck.java \
+            checks/DrawCheck.java \
+            checks/LauncherCheck.java
+          java -cp build/checks de.auria.kipphintergrund.MotionCheck
+          java -cp build/checks de.auria.kipphintergrund.DrawCheck
+          java -cp build/checks de.auria.kipphintergrund.LauncherCheck
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Signierschlüssel aus den GitHub-Secrets holen
+        env:
+          KEYSTORE_B64: ${{ secrets.KIPP_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secret KIPP_KEYSTORE_B64 fehlt. Ohne den festen Schlüssel ließe sich das Update nicht über die alte Version installieren."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/kipp.keystore"
+          echo "KIPP_KEYSTORE=$RUNNER_TEMP/kipp.keystore" >> "$GITHUB_ENV"
+
+      - name: APK bauen
+        env:
+          KIPP_KEYSTORE_PASSWORD: ${{ secrets.KIPP_KEYSTORE_PASSWORD }}
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Signatur prüfen (gleicher Schlüssel wie bisher)
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee signatur.txt
+          ACTUAL=$(grep -m1 'certificate SHA-256 digest' signatur.txt | awk '{print $NF}')
+          if [ "$ACTUAL" != "$KIPP_CERT_SHA256" ]; then
+            echo "::error::Falscher Signierschlüssel ($ACTUAL). Update würde sich nicht installieren lassen."
+            exit 1
+          fi
+          echo "Signatur stimmt: $ACTUAL"
+
+      - name: Schlüssel vom Bau-Rechner löschen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kipp.keystore"
+
+      - name: Android-Prüfung (Lint)
+        continue-on-error: true
+        run: |
+          gradle :app:lintRelease --no-daemon
+          REPORT=$(ls app/build/reports/lint-results-release.xml 2>/dev/null || true)
+          if [ -n "$REPORT" ]; then
+            ERRORS=$(grep -c 'severity="Error"\|severity="Fatal"' "$REPORT" || true)
+            WARNINGS=$(grep -c 'severity="Warning"' "$REPORT" || true)
+            echo "### Android-Prüfung (Lint): $ERRORS Fehler, $WARNINGS Warnungen" >> "$GITHUB_STEP_SUMMARY"
+            grep -o 'id="[^"]*"[^>]*severity="[^"]*"[^>]*message="[^"]*"' "$REPORT" | head -40 | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Lint-Bericht
+          path: app/build/reports/lint-results-release.*
+          if-no-files-found: ignore
+
+      - name: APK umbenennen und Version lesen
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk Kipp-Start.apk
+          echo "KIPP_VERSION=$(grep '^kippVersion=' gradle.properties | cut -d= -f2)" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kipp-Start-apk
+          path: Kipp-Start.apk
+
+      - name: Als Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.KIPP_VERSION }}.${{ github.run_number }}
+          name: Kipp-Start ${{ env.KIPP_VERSION }} (Bau ${{ github.run_number }})
+          files: Kipp-Start.apk
+          body: |
+            **Kipp-Start.apk** herunterladen und auf dem Android-Handy öffnen (Android 12 oder neuer).
+            Anleitung: https://github.com/Scarhand1988/kipp-start#installieren
+            Download **Kipp-Start.apk** and open it on your Android phone (Android 12+). Guide: https://github.com/Scarhand1988/kipp-start#english
