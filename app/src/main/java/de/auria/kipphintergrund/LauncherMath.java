@@ -163,6 +163,37 @@ final class LauncherMath {
         return seconds > .05f && 1f - springProgress(seconds, v0) < .002f;
     }
 
+    /**
+     * Neu in 0.15 – gegen Ruckeln: Kipp-Unschärfe und Abdunklung der Symbole erst bei einer sichtbaren
+     * Änderung neu setzen. Jede neue Stufe zwingt die Grafik, den ganzen Bildschirm neu weichzuzeichnen;
+     * das Zittern der Hand änderte die Stufe vorher in fast jedem Bild.
+     */
+    static final int BLUR_STEP = 2;   // Pixel
+    static final int DIM_STEP = 3;    // von 255 (ca. 1 % Helligkeit)
+    /** Antippen geht durch, sobald die einrastende Seite höchstens so viel ihrer Breite vom Ziel entfernt ist. */
+    static final float TAP_SETTLED = .06f;
+
+    /** Neuer Wert erst ab step Abstand zum gesetzten; zurück auf 0 immer sofort. */
+    static int settle(int applied, int target, int step) {
+        if (target <= 0) return 0;
+        return Math.abs(target - applied) >= step ? target : applied;
+    }
+
+    /** Unschärfe einer Seite beim Blättern in geraden Pixeln (halb so viele verschiedene Effekte). */
+    static int pageBlurPixels(float offset, float density) {
+        return 2 * Math.round(pageBlur(offset) * PAGE_BLUR_DP * density / 2f);
+    }
+
+    /** Seite liegt (teilweise) im Bild; weiter außen ist sie ohnehin unsichtbar (pageAlpha = 0). */
+    static boolean pageVisible(float offset) {
+        return Math.abs(offset) < 1f;
+    }
+
+    /** Einrastende Seite steht praktisch: Antippen soll das Symbol treffen statt die Seite anzuhalten. */
+    static boolean tapThrough(float remainingPixels, float width) {
+        return width > 0 && Math.abs(remainingPixels) <= TAP_SETTLED * width;
+    }
+
     /** Hintergrund-Versatz 0 … 1 für die Seitenposition (Android-Standard für Startbildschirme). */
     static float wallpaperOffset(float scrollX, float width, int pages) {
         if (pages <= 1 || width <= 0) return .5f;

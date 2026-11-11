@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 0.15 – weniger Ruckeln
+
+- **Kipp-Effekt auf den Symbolen:** Unschärfe und Abdunklung werden erst bei einer sichtbaren Änderung neu gesetzt (Unschärfe in 2-px-, Abdunklung in 3/255-Schritten, zurück in Ruhe immer sofort ganz). Vorher änderte schon das Zittern der Hand die Stufe in fast jedem Bild, und die Grafik musste den ganzen Startbildschirm jedes Mal neu weichzeichnen – zusätzlich zum Hintergrund, der im selben Prozess zeichnet. Bei ruhiger Hand bleibt das weichgezeichnete Bild jetzt im Zwischenspeicher der Grafik.
+- **Blättern:** Seiten ganz außerhalb des Bildschirms (ohnehin unsichtbar) bekommen keinen Weichzeichner mehr; die Unschärfe der Nachbarseite läuft in geraden Pixelstufen.
+- **Antippen nach dem Blättern:** Sobald die einrastende Seite höchstens 6 % ihrer Breite vom Ziel entfernt ist (nach ca. 0,3 s), trifft ein Tippen das Symbol; die Seite rastet weich zu Ende ein. Vorher wurde jedes Tippen bis zum völligen Stillstand (ca. 0,7 s) verschluckt.
+- **App-Übersicht:** Solange sie offen ist, wird die Liste beim Kippen nicht mehr unscharf und dunkel; Scrollen muss nicht in jedem Bild den ganzen Bildschirm weichzeichnen.
+- `checks/LauncherCheck` prüft die neuen Regeln (`settle`, `pageBlurPixels`, `pageVisible`, `tapThrough`).
+
 ## iPhone-Web-App 1.0
 
 - Neue Web-App fürs iPhone im Ordner `web/`, veröffentlicht über GitHub Pages: https://scarhand1988.github.io/kipp-start/

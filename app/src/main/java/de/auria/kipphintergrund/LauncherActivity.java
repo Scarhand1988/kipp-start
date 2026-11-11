@@ -97,6 +97,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private boolean detentOn;
     private int pendingWidgetId = -1;
     private int loadGeneration;
+    // Zuletzt gesetzter Kipp-Effekt (0.15): nur bei sichtbarer Änderung neu setzen
+    private int appliedBlur;
+    private int appliedDim;
 
     /** Falls der Hintergrund mitten in der Entsperr-Animation verstummt: Symbole nicht unsichtbar lassen. */
     private final Runnable unlockWatchdog = new Runnable() {
@@ -396,6 +399,10 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
         root.startDrag(drag, icon.app.icon, iconSize, iconSize, v);
         return true;
+    }
+
+    @Override public void onDrawerOpenChanged() {
+        onTilt(TiltBus.soft(), TiltBus.dark(), TiltBus.unlock());
     }
 
     @Override public boolean onDrawerAppLongClick(IconView view) {
@@ -904,14 +911,21 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override public void onTilt(float soft, float dark, float unlock) {
         if (content == null) return;
-        if (!tiltOn) {
+        // App-Übersicht offen (neu in 0.15): Liste bleibt beim Kippen scharf und lesbar; beim Scrollen muss die
+        // Grafik nicht den ganzen Bildschirm in jedem Bild weichzeichnen. Entsperren wirkt weiter.
+        if (!tiltOn || (drawer != null && drawer.isOpen())) {
             soft = 0f;
             dark = 0f;
         }
         if (!unlockOn) unlock = 0f;
-        int blur = LauncherMath.blurPixels(soft, unlock, density);
-        int dim = DrawMath.dimLevel(Math.max(dark, Effects.UNLOCK_DIM * unlock));
-        content.setRenderEffect(effects.get(blur, dim));
+        // Zittern der Hand nicht weitergeben: sonst zeichnet die Grafik den ganzen Bildschirm in fast jedem Bild neu weich
+        int blur = LauncherMath.settle(appliedBlur, LauncherMath.blurPixels(soft, unlock, density), LauncherMath.BLUR_STEP);
+        int dim = LauncherMath.settle(appliedDim, DrawMath.dimLevel(Math.max(dark, Effects.UNLOCK_DIM * unlock)), LauncherMath.DIM_STEP);
+        if (blur != appliedBlur || dim != appliedDim) {
+            appliedBlur = blur;
+            appliedDim = dim;
+            content.setRenderEffect(effects.get(blur, dim));
+        }
         float scale = LauncherMath.unlockScale(unlock);
         content.setScaleX(scale);
         content.setScaleY(scale);

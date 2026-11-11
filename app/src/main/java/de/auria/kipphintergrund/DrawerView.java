@@ -30,6 +30,9 @@ final class DrawerView extends FrameLayout {
         void onDrawerAppClick(IconView view);
 
         boolean onDrawerAppLongClick(IconView view);
+
+        /** Übersicht geöffnet oder geschlossen (0.15: Kipp-Effekt der Symbole dabei aussetzen). */
+        void onDrawerOpenChanged();
     }
 
     private final Callbacks callbacks;
@@ -119,6 +122,7 @@ final class DrawerView extends FrameLayout {
         if (open) return;
         open = true;
         closing = false;
+        callbacks.onDrawerOpenChanged();
         setVisibility(VISIBLE);
         animate().cancel();
         setAlpha(0f);
@@ -137,6 +141,7 @@ final class DrawerView extends FrameLayout {
     void close(boolean animate) {
         if (!open) return;
         open = false;
+        callbacks.onDrawerOpenChanged();
         InputMethodManager ime = getContext().getSystemService(InputMethodManager.class);
         if (ime != null) ime.hideSoftInputFromWindow(getWindowToken(), 0);
         search.clearFocus();

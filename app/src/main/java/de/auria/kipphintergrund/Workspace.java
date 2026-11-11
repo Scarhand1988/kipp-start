@@ -223,8 +223,17 @@ final class Workspace extends ViewGroup {
                 page.setScaleY(1f);
                 continue;
             }
+            if (!LauncherMath.pageVisible(offset)) {
+                // Ganz außerhalb (ohnehin unsichtbar): kein Weichzeichnen in jedem Bild (neu in 0.15)
+                page.setAlpha(0f);
+                page.setRenderEffect(null);
+                page.setScaleX(1f);
+                page.setScaleY(1f);
+                continue;
+            }
             page.setAlpha(LauncherMath.pageAlpha(offset));
-            page.setRenderEffect(effects.get(Math.round(LauncherMath.pageBlur(offset) * LauncherMath.PAGE_BLUR_DP * density), 0));
+            // Gerade Pixelstufen: gleiche Stufe = gleiches Effekt-Objekt aus dem Zwischenspeicher, nichts neu weichzuzeichnen
+            page.setRenderEffect(effects.get(LauncherMath.pageBlurPixels(offset, density), 0));
             float scale = LauncherMath.pageScale(offset);
             page.setScaleX(scale);
             page.setScaleY(scale);
@@ -254,7 +263,10 @@ final class Workspace extends ViewGroup {
             case MotionEvent.ACTION_DOWN:
                 down(ev);
                 if (springing) {
-                    // Seite rastet gerade ein: Antippen trifft keine Symbole, ein neues Wischen blättert weiter
+                    // Seite steht praktisch (neu in 0.15): Antippen trifft das Symbol, die Feder läuft weich zu Ende.
+                    // Vorher war jedes Tippen bis zum völligen Stillstand (ca. 0,7 s) verschluckt.
+                    if (LauncherMath.tapThrough(springTo - getScrollX(), getWidth())) return false;
+                    // Seite noch deutlich in Bewegung: Antippen trifft keine Symbole, ein neues Wischen blättert weiter
                     mode = PAGE;
                     if (!detent) springing = false;
                     return true;
@@ -358,6 +370,8 @@ final class Workspace extends ViewGroup {
         float dy = ev.getY() - downY;
         if (Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
             mode = PAGE;
+            // Ohne Absatz hält der Finger die Seite fest (auch wenn sie beim Aufsetzen noch auslief)
+            if (!detent) springing = false;
             lastX = ev.getX();
             cancelEmptyPress();
             getParent().requestDisallowInterceptTouchEvent(true);
