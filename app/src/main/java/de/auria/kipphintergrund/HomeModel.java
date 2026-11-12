@@ -49,6 +49,19 @@ final class HomeModel {
             return item;
         }
 
+        Item copy() {
+            Item c = new Item();
+            c.type = type;
+            c.component = component;
+            c.widgetId = widgetId;
+            c.page = page;
+            c.x = x;
+            c.y = y;
+            c.w = w;
+            c.h = h;
+            return c;
+        }
+
         boolean covers(int cx, int cy) {
             return cx >= x && cx < x + w && cy >= y && cy < y + h;
         }
@@ -115,39 +128,76 @@ final class HomeModel {
         return model;
     }
 
+    /** 0.25: unabhängige Kopie für „Rückgängig“. */
+    HomeModel copy() {
+        HomeModel c = new HomeModel();
+        for (Item item : items) c.items.add(item.copy());
+        System.arraycopy(dock, 0, c.dock, 0, dock.length);
+        c.pages = pages;
+        c.defaultPage = defaultPage;
+        return c;
+    }
+
+    /** Stand aus einer Kopie zurückholen (Rückgängig). */
+    void restoreFrom(HomeModel other) {
+        items.clear();
+        for (Item item : other.items) items.add(item.copy());
+        System.arraycopy(other.dock, 0, dock, 0, dock.length);
+        pages = other.pages;
+        defaultPage = other.defaultPage;
+    }
+
+    /** Vergleichbarer Stand als Text (gleich = nichts geändert). */
+    String fingerprint() {
+        try {
+            return toJson().toString();
+        } catch (JSONException e) {
+            return "";
+        }
+    }
+
+    JSONObject toJson() throws JSONException {
+        JSONObject json = new JSONObject();
+        json.put("version", 1);
+        json.put("pages", pages);
+        json.put("defaultPage", defaultPage);
+        JSONArray list = new JSONArray();
+        for (Item item : items) {
+            JSONObject o = new JSONObject();
+            o.put("type", item.type);
+            o.put("page", item.page);
+            o.put("x", item.x);
+            o.put("y", item.y);
+            o.put("w", item.w);
+            o.put("h", item.h);
+            if (item.type == Item.APP) o.put("component", item.component.flattenToString());
+            else o.put("widget", item.widgetId);
+            list.put(o);
+        }
+        json.put("items", list);
+        JSONArray dockList = new JSONArray();
+        for (ComponentName c : dock) dockList.put(c == null ? "" : c.flattenToString());
+        json.put("dock", dockList);
+        return json;
+    }
+
+    private static void writeJson(Context context, JSONObject json) {
+        AtomicFile file = file(context);
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(json.toString().getBytes(StandardCharsets.UTF_8));
+            file.finishWrite(out);
+        } catch (IOException e) {
+            if (out != null) file.failWrite(out);
+        }
+    }
+
     void save(Context context) {
         try {
-            JSONObject json = new JSONObject();
-            json.put("version", 1);
-            json.put("pages", pages);
-            json.put("defaultPage", defaultPage);
-            JSONArray list = new JSONArray();
-            for (Item item : items) {
-                JSONObject o = new JSONObject();
-                o.put("type", item.type);
-                o.put("page", item.page);
-                o.put("x", item.x);
-                o.put("y", item.y);
-                o.put("w", item.w);
-                o.put("h", item.h);
-                if (item.type == Item.APP) o.put("component", item.component.flattenToString());
-                else o.put("widget", item.widgetId);
-                list.put(o);
-            }
-            json.put("items", list);
-            JSONArray dockList = new JSONArray();
-            for (ComponentName c : dock) dockList.put(c == null ? "" : c.flattenToString());
-            json.put("dock", dockList);
-            AtomicFile file = file(context);
-            FileOutputStream out = file.startWrite();
-            try {
-                out.write(json.toString().getBytes(StandardCharsets.UTF_8));
-                file.finishWrite(out);
-            } catch (IOException e) {
-                file.failWrite(out);
-            }
+            writeJson(context, toJson());
             fresh = false;
-        } catch (IOException | JSONException ignored) {
+        } catch (JSONException ignored) {
             // Nächster Versuch beim nächsten Ändern
         }
     }

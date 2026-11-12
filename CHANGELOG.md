@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.25 – Rückgängig
+
+- Nach jedem Verschieben oder Entfernen von Symbolen, Dock-Apps und Widgets erscheint unten 5 Sekunden lang „Verschoben / Entfernt · **Rückgängig**“. Antippen stellt den Stand davor wieder her.
+- Entfernte Widgets werden erst endgültig gelöscht, wenn das Angebot verfallen ist – sonst ließen sie sich nicht zurückholen.
+- `HomeModel` kann sich kopieren, vergleichen und wiederherstellen; Speichern läuft über eine gemeinsame `toJson()`.
+
 ## 0.24 – App-Übersicht und Startbildschirm-Blatt im Grafit-Kupfer-Look
 
 - **App-Übersicht:** Grafit-Hintergrund, Überschrift „ALLE APPS“ in Kupfer, Suchfeld eingelassen mit Kupfer-Rand und -Punkt.

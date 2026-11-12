@@ -269,6 +269,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         dropBar.addView(dropInfo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         root.addView(dropBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(96), Gravity.TOP));
 
+        buildUndoBar();
+
         // 0.23: Messanzeige des Startbildschirms (oben rechts; die des Hintergrunds steht oben links)
         meterView = new TextView(this);
         meterView.setVisibility(View.GONE);
@@ -282,6 +284,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             insetTop = bars.top;
             meterParams.topMargin = bars.top + dp(6);
             meterParams.rightMargin = dp(8);
+            if (undoParams != null) undoParams.bottomMargin = bars.bottom + dp(150);
             insetBottom = bars.bottom;
             applyInsets();
             return insets;
@@ -592,7 +595,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             model.dock[d.dockSlot] = null;
         } else if (d.item != null) {
             model.items.remove(d.item);
-            if (d.item.type == HomeModel.Item.WIDGET) widgetHost.deleteAppWidgetId(d.item.widgetId);
+            // 0.25: Widget erst endgültig löschen, wenn „Rückgängig“ verfallen ist
+            if (d.item.type == HomeModel.Item.WIDGET) pendingWidgetDeletes.add(d.item.widgetId);
         }
     }
 
@@ -766,6 +770,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             float gx = grabX;
             float gy = grabY;
             endDrag();
+            // 0.25: Stand vorher merken – nach jeder Änderung lässt sie sich 5 s lang rückgängig machen
+            HomeModel before = model.copy();
+            String beforePrint = model.fingerprint();
             if (zone == 1) {
                 removeDragged(d);
             } else if (zone == 2) {
@@ -779,7 +786,82 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             model.trimPages();
             model.save(LauncherActivity.this);
             bindAll();
+            if (zone != 2 && !beforePrint.equals(model.fingerprint())) offerUndo(before, zone == 1 ? "Entfernt" : "Verschoben");
         }
+    }
+
+    // ---------- Rückgängig (0.25) ----------
+
+    private TextView undoBar;
+    private FrameLayout.LayoutParams undoParams;
+    private HomeModel undoState;
+    private final ArrayList<Integer> pendingWidgetDeletes = new ArrayList<>();
+    private final Runnable undoExpired = () -> {
+        undoState = null;
+        hideUndo();
+        for (int id : pendingWidgetDeletes) {
+            try {
+                widgetHost.deleteAppWidgetId(id);
+            } catch (RuntimeException ignored) {}
+        }
+        pendingWidgetDeletes.clear();
+    };
+
+    private void buildUndoBar() {
+        undoBar = new TextView(this);
+        undoBar.setTextSize(15);
+        undoBar.setTextColor(KippStyle.TEXT);
+        undoBar.setGravity(Gravity.CENTER);
+        undoBar.setMinHeight(dp(48));
+        undoBar.setPadding(dp(20), 0, dp(20), 0);
+        GradientDrawable pill = new GradientDrawable();
+        pill.setColor(0xF22C2F33);
+        pill.setCornerRadius(dp(24));
+        pill.setStroke(Math.max(1, dp(1)), 0x55D9A066);
+        undoBar.setBackground(pill);
+        undoBar.setElevation(dp(8));
+        undoBar.setVisibility(View.GONE);
+        undoBar.setOnClickListener(v -> undo());
+        undoParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        undoParams.bottomMargin = dp(150);
+        root.addView(undoBar, undoParams);
+    }
+
+    private void offerUndo(HomeModel before, String what) {
+        // Ein älteres Angebot verfällt jetzt (seine Widgets werden endgültig gelöscht)
+        if (undoState != null) {
+            main.removeCallbacks(undoExpired);
+            undoExpired.run();
+        }
+        undoState = before;
+        android.text.SpannableString text = new android.text.SpannableString(what + "   Rückgängig");
+        text.setSpan(new android.text.style.ForegroundColorSpan(KippStyle.COPPER), what.length() + 3, text.length(), 0);
+        text.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), what.length() + 3, text.length(), 0);
+        undoBar.setText(text);
+        undoBar.setContentDescription(what + ". Rückgängig machen");
+        undoBar.setVisibility(View.VISIBLE);
+        undoBar.setAlpha(0f);
+        undoBar.setTranslationY(dp(16));
+        undoBar.animate().alpha(1f).translationY(0).setDuration(180).start();
+        main.postDelayed(undoExpired, 5000);
+    }
+
+    private void hideUndo() {
+        if (undoBar == null || undoBar.getVisibility() != View.VISIBLE) return;
+        undoBar.animate().alpha(0f).setDuration(150).withEndAction(() -> undoBar.setVisibility(View.GONE)).start();
+    }
+
+    private void undo() {
+        if (undoState == null) return;
+        main.removeCallbacks(undoExpired);
+        model.restoreFrom(undoState);
+        undoState = null;
+        pendingWidgetDeletes.clear(); // entfernte Widgets sind wieder da
+        model.save(this);
+        bindAll();
+        hideUndo();
+        undoBar.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
     }
 
     // ---------- Gesten und Einstellungen ----------
@@ -1082,6 +1164,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
         if (wallpaperPrefs != null) wallpaperPrefs.unregisterOnSharedPreferenceChangeListener(measureListener);
         if (meter != null) meter.stop();
+        main.removeCallbacks(undoExpired);
+        undoExpired.run(); // offene Widget-Löschungen abschließen
         TiltBus.clearListener(this);
         try {
             launcherApps.unregisterCallback(appsCallback);
