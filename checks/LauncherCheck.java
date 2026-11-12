@@ -138,6 +138,11 @@ public final class LauncherCheck {
         }
         require(freeAt > .25f && freeAt < .4f, "Tippen nach ca. 0,3 s wieder möglich statt erst nach 0,7 s (" + freeAt + ")");
 
+        // 0.23 – Messanzeige Startbildschirm
+        require(!LauncherMath.janky(8_000_000L, 11_111_111L) && LauncherMath.janky(12_000_000L, 11_111_111L),
+                "Bei 90 Hz: 8 ms flüssig, 12 ms ruckelig");
+        require(!LauncherMath.janky(15_000_000L, 0) && LauncherMath.janky(20_000_000L, 0), "Ohne Termin gilt 1/60 s");
+
         System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln.");
     }
 }

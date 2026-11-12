@@ -77,6 +77,13 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private int insetBottom;
 
     private DragLayer root;
+    private TextView meterView;
+    private FrameLayout.LayoutParams meterParams;
+    private LauncherMeter meter;
+    private SharedPreferences wallpaperPrefs;
+    private final SharedPreferences.OnSharedPreferenceChangeListener measureListener = (shared, key) -> {
+        if (PhotoStore.MEASURE.equals(key)) syncMeter();
+    };
     private FrameLayout content;
     private Workspace workspace;
     private LinearLayout bottomBar;
@@ -262,9 +269,19 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         dropBar.addView(dropInfo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         root.addView(dropBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(96), Gravity.TOP));
 
+        // 0.23: Messanzeige des Startbildschirms (oben rechts; die des Hintergrunds steht oben links)
+        meterView = new TextView(this);
+        meterView.setVisibility(View.GONE);
+        meterParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        root.addView(meterView, meterParams);
+        meter = new LauncherMeter(this, meterView);
+
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
             insetTop = bars.top;
+            meterParams.topMargin = bars.top + dp(6);
+            meterParams.rightMargin = dp(8);
             insetBottom = bars.bottom;
             applyInsets();
             return insets;
@@ -1004,8 +1021,23 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     // ---------- Lebenszyklus ----------
 
+    private void syncMeter() {
+        if (meter == null) return;
+        boolean on = wallpaperPrefs != null && wallpaperPrefs.getBoolean(PhotoStore.MEASURE, false) && started;
+        if (on) meter.start();
+        else meter.stop();
+    }
+
+    private boolean started;
+
     @Override protected void onStart() {
         super.onStart();
+        started = true;
+        if (wallpaperPrefs == null) {
+            wallpaperPrefs = PhotoStore.preferences(this);
+            wallpaperPrefs.registerOnSharedPreferenceChangeListener(measureListener);
+        }
+        syncMeter();
         try {
             widgetHost.startListening();
         } catch (RuntimeException ignored) {}
@@ -1013,6 +1045,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override protected void onStop() {
         super.onStop();
+        started = false;
+        syncMeter();
         try {
             widgetHost.stopListening();
         } catch (RuntimeException ignored) {}
@@ -1046,6 +1080,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override protected void onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
+        if (wallpaperPrefs != null) wallpaperPrefs.unregisterOnSharedPreferenceChangeListener(measureListener);
+        if (meter != null) meter.stop();
         TiltBus.clearListener(this);
         try {
             launcherApps.unregisterCallback(appsCallback);

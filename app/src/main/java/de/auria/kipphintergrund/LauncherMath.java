@@ -194,6 +194,12 @@ final class LauncherMath {
         return width > 0 && Math.abs(remainingPixels) <= TAP_SETTLED * width;
     }
 
+    /** 0.23: Bild hat seinen Termin verpasst (ruckelig). Ohne Termin (0) zählt ein Bild über 1/60 s. */
+    static boolean janky(long totalNanos, long deadlineNanos) {
+        long limit = deadlineNanos > 0 ? deadlineNanos : 16_666_667L;
+        return totalNanos > limit;
+    }
+
     /** Hintergrund-Versatz 0 … 1 für die Seitenposition (Android-Standard für Startbildschirme). */
     static float wallpaperOffset(float scrollX, float width, int pages) {
         if (pages <= 1 || width <= 0) return .5f;

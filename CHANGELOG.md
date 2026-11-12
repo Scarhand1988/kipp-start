@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 0.23 – Messanzeige auch für den Startbildschirm
+
+- Ist die **Messanzeige** an, zeigt Kipp-Start oben rechts die Bilder des Startbildschirms selbst: Bilder pro Sekunde, wie viele davon ihren Anzeigetermin verpasst haben („ruckelig“) und die mittlere Zeit pro Bild – gemessen mit Androids Frame-Metriken, jeweils über eine Sekunde. Oben links bleibt die Anzeige des Hintergrunds.
+- Damit lässt sich beim Blättern, Antippen und Entsperren mit Zahlen prüfen, ob es ruckelt.
+
 ## 0.22 – Sensor-Ruhemodus
 
 - Liegt das Handy etwa 2,5 Sekunden still (Drehung unter ca. 0,75°), liest der Hintergrund den Lagesensor nur noch 25-mal statt 100-mal pro Sekunde. Bei der ersten spürbaren Drehung schaltet er sofort zurück. Spart Akku, wenn das Handy auf dem Tisch liegt.

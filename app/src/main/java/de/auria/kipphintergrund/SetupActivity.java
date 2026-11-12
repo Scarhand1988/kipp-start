@@ -345,7 +345,7 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(preferences, PhotoStore.PAGE_BLUR, false)));
         p.addView(row("Beschriftungen anzeigen", null, prefSwitch(launcherPrefs, SettingsSheet.LABELS, true)));
         p.addView(row("Glanzrand", "Heller Rand oben an den Symbolen.", prefSwitch(launcherPrefs, SettingsSheet.GLOW, true)));
-        p.addView(row("Messanzeige", "Bilder pro Sekunde beim Kippen, zum Testen.", prefSwitch(preferences, PhotoStore.MEASURE, false)));
+        p.addView(row("Messanzeige", "Oben links der Hintergrund, oben rechts der Startbildschirm: Bilder pro Sekunde und Ruckler. Zum Testen.", prefSwitch(preferences, PhotoStore.MEASURE, false)));
     }
 
     private void buildPhotoPanel(LinearLayout p) {
