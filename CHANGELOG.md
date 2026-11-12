@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 0.19 – Icon passend zur Live-Vorschau
+
+- **Neues Icon „Kupfer-Linien“:** dasselbe Motiv wie bisher (gekipptes Foto vor einer zweiten Ebene), jetzt als Kupfer-Linien auf Grafit – passend zum Einstellungs-Bildschirm aus 0.18.
+- Einfarbige Ebene für „Designsymbole“ und das runde Vorschaubild in der Hintergrund-Auswahl zeigen dasselbe Motiv.
+
 ## 0.18 – neuer Einstellungs-Bildschirm „Live-Vorschau“
 
 - **Ein gemeinsamer Bildschirm** für Hintergrund und Startbildschirm (Layout C): oben eine Live-Vorschau mit deinem Foto, Ausschnitt und Kipp-Unschärfe, leicht schräg wie ein gekipptes Handy; darunter ein Blatt mit den Reitern **Kippen**, **Blättern** und **Foto**.
