@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 0.20 – Live-Vorschau bewegt sich
+
+- **Echte Live-Vorschau:** Das Foto oben im Einstellungs-Bildschirm bewegt sich jetzt beim Kippen genau wie der Hintergrund und verschwimmt mit der eingestellten Kipp-Unschärfe. Vorher war es ein stehendes Bild. Im Reiter Foto steht es still, damit sich der Ausschnitt genau einstellen lässt.
+- Die Vorschau passt jetzt immer ganz über das Einstellungs-Blatt (war unten abgeschnitten).
+
 ## 0.19 – Icon passend zur Live-Vorschau
 
 - **Neues Icon „Kupfer-Linien“:** dasselbe Motiv wie bisher (gekipptes Foto vor einer zweiten Ebene), jetzt als Kupfer-Linien auf Grafit – passend zum Einstellungs-Bildschirm aus 0.18.

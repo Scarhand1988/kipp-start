@@ -35,7 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.IntConsumer;
 
-public final class SetupActivity extends Activity {
+public final class SetupActivity extends Activity implements android.hardware.SensorEventListener {
     private static final int PICK_IMAGE = 42;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -57,7 +57,7 @@ public final class SetupActivity extends Activity {
     private volatile int previewGeneration;
     private final Runnable saveBlur = this::saveBlur;
     private final Runnable hidePreview = () -> {
-        image.previewAlpha = 0;
+        image.previewAlpha = 0; // weiche Fassung bleibt für die Live-Unschärfe beim Kippen
         image.invalidate();
     };
     private boolean reading;
@@ -83,6 +83,35 @@ public final class SetupActivity extends Activity {
     static final int TAB_PHOTO = 2;
 
     private SharedPreferences launcherPrefs;
+    // 0.20: echte Live-Vorschau – das Foto bewegt sich beim Kippen und verschwimmt wie der Hintergrund
+    private final TiltTracker tracker = new TiltTracker();
+    private android.hardware.SensorManager sensors;
+    private android.hardware.Sensor sensor;
+    private volatile float tiltTargetX;
+    private volatile float tiltTargetY;
+    private float tiltX;
+    private float tiltY;
+    private long lastFrame;
+    private boolean running;
+    private final android.view.Choreographer.FrameCallback liveFrame = new android.view.Choreographer.FrameCallback() {
+        @Override public void doFrame(long now) {
+            if (!running) return;
+            float seconds = lastFrame == 0 ? .012f : Math.min(.04f, (now - lastFrame) / 1_000_000_000f);
+            lastFrame = now;
+            boolean live = tab != TAB_PHOTO; // beim Zuschneiden steht das Bild still
+            float tx = live ? tiltTargetX : 0f;
+            float ty = live ? tiltTargetY : 0f;
+            float nx = MotionMath.approach(tiltX, tx, seconds);
+            float ny = MotionMath.approach(tiltY, ty, seconds);
+            if (nx != tiltX || ny != tiltY) {
+                tiltX = nx;
+                tiltY = ny;
+                image.invalidate();
+            }
+            android.view.Choreographer.getInstance().postFrameCallback(this);
+        }
+    };
+    private int sheetTop;
     private android.widget.FrameLayout previewFrame;
     private final LinearLayout[] panels = new LinearLayout[3];
     private final TextView[] tabs = new TextView[3];
@@ -171,6 +200,7 @@ public final class SetupActivity extends Activity {
         sheet.setPadding(dp(20), dp(10), dp(20), dp(16));
         android.widget.FrameLayout.LayoutParams sheetParams = new android.widget.FrameLayout.LayoutParams(-1, -1);
         sheetParams.topMargin = previewHeight - dp(20);
+        sheetTop = sheetParams.topMargin;
         root.addView(sheet, sheetParams);
 
         View handle = new View(this);
@@ -232,6 +262,12 @@ public final class SetupActivity extends Activity {
             backParams.topMargin = safe.top + dp(14);
             liveParams.topMargin = safe.top + dp(28);
             frameParams.topMargin = safe.top + dp(64);
+            // 0.20: Vorschau passt immer ganz über das Blatt (vorher unten abgeschnitten)
+            int room = sheetTop - frameParams.topMargin - dp(14);
+            if (room > dp(80) && room < frameParams.height) {
+                frameParams.height = room;
+                frameParams.width = Math.round((room - dp(10)) / aspect) + dp(10);
+            }
             sheet.setPadding(dp(20), dp(10), dp(20), dp(16) + safe.bottom);
             view.requestLayout();
             return insets;
@@ -241,6 +277,11 @@ public final class SetupActivity extends Activity {
         buildPagesPanel(panels[TAB_PAGES]);
         buildPhotoPanel(panels[TAB_PHOTO]);
 
+        sensors = getSystemService(android.hardware.SensorManager.class);
+        if (sensors != null) {
+            sensor = sensors.getDefaultSensor(android.hardware.Sensor.TYPE_GAME_ROTATION_VECTOR);
+            if (sensor == null) sensor = sensors.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR);
+        }
         setContentView(root);
         selectTab(getIntent().getIntExtra(EXTRA_TAB, TAB_TILT));
         readThumbnail();
@@ -601,6 +642,7 @@ public final class SetupActivity extends Activity {
     private void showImage(Bitmap thumbnail) {
         image.photo = thumbnail;
         image.soft = null;
+        main.post(this::prepareSoft);
         image.previewAlpha = 0;
         x = preferences.getFloat(PhotoStore.X, 0f);
         y = preferences.getFloat(PhotoStore.Y, 0f);
@@ -676,6 +718,28 @@ public final class SetupActivity extends Activity {
         });
     }
 
+    /** Weiche Fassung für die Live-Unschärfe vorbereiten, ohne sie gleich zu zeigen. */
+    private void prepareSoft() {
+        Bitmap thumbnail = image.photo;
+        float strength = blurStrength;
+        if (thumbnail == null || strength <= 0) return;
+        int generation = ++previewGeneration;
+        worker.execute(() -> {
+            if (generation != previewGeneration) return;
+            int width = thumbnail.getWidth();
+            int height = thumbnail.getHeight();
+            int[] pixels = new int[width * height];
+            thumbnail.getPixels(pixels, 0, width, 0, 0, width, height);
+            SoftFocus.blur(pixels, width, height, SoftFocus.radius(strength), SoftFocus.PASSES);
+            Bitmap soft = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
+            main.post(() -> {
+                if (isDestroyed() || generation != previewGeneration) return;
+                image.soft = soft;
+                image.invalidate();
+            });
+        });
+    }
+
     private void requestTile() {
         if (Build.VERSION.SDK_INT < 33) return;
         try {
@@ -694,13 +758,31 @@ public final class SetupActivity extends Activity {
         }
     }
 
+    @Override public void onSensorChanged(android.hardware.SensorEvent event) {
+        tracker.update(event.values, event.timestamp);
+        tiltTargetX = tracker.x();
+        tiltTargetY = tracker.y();
+    }
+
+    @Override public void onAccuracyChanged(android.hardware.Sensor s, int accuracy) {}
+
     @Override protected void onResume() {
         super.onResume();
+        if (sensors != null && sensor != null && preferences.getBoolean(PhotoStore.ENABLED, true)) {
+            tracker.reset();
+            sensors.registerListener(this, sensor, 10_000);
+        }
+        running = true;
+        lastFrame = 0;
+        android.view.Choreographer.getInstance().postFrameCallback(liveFrame);
         // Der Schnellschalter kann den Zustand inzwischen geändert haben
         effect.setChecked(preferences.getBoolean(PhotoStore.ENABLED, true));
     }
 
     @Override protected void onPause() {
+        running = false;
+        if (sensors != null) sensors.unregisterListener(this);
+        android.view.Choreographer.getInstance().removeFrameCallback(liveFrame);
         main.removeCallbacks(saveCrop);
         saveCrop();
         super.onPause();
@@ -796,12 +878,15 @@ public final class SetupActivity extends Activity {
             if (photo == null) return;
             // Gleiche Vergrößerung wie der Startbildschirm in Ruhe, damit die Vorschau dem Ergebnis entspricht
             MotionMath.cover(getWidth(), getHeight(), photo.getWidth(), photo.getHeight(),
-                    zoom, x, y, 0, 0, systemScale, bounds);
+                    zoom, x, y, tiltX, tiltY, systemScale, bounds);
             destination.set(bounds[0], bounds[1], bounds[2], bounds[3]);
             paint.setAlpha(255);
             canvas.drawBitmap(photo, null, destination, paint);
-            if (soft != null && previewAlpha > 0) {
-                paint.setAlpha(Math.round(255 * previewAlpha));
+            // Kipp-Unschärfe wie im Hintergrund; beim Verschieben des Reglers volle Neigung zeigen
+            float liveSoft = SoftFocus.alpha(Math.min(1f, Math.max(Math.abs(tiltX), Math.abs(tiltY))), blurStrength);
+            float shown = Math.max(previewAlpha, liveSoft);
+            if (soft != null && shown > 0) {
+                paint.setAlpha(Math.round(255 * shown));
                 canvas.drawBitmap(soft, null, destination, paint);
                 paint.setAlpha(255);
             }
