@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.24 – App-Übersicht und Startbildschirm-Blatt im Grafit-Kupfer-Look
+
+- **App-Übersicht:** Grafit-Hintergrund, Überschrift „ALLE APPS“ in Kupfer, Suchfeld eingelassen mit Kupfer-Rand und -Punkt.
+- **Startbildschirm-Blatt:** Grafit-Verlauf wie im Einstellungs-Bildschirm, „Alle Einstellungen“ als großer Kupfer-Knopf, die übrigen Aktionen als Kupfer-Zeilen mit Trennlinien.
+- Neue gemeinsame Stil-Klasse `KippStyle` für Farben und Formen.
+
 ## 0.23 – Messanzeige auch für den Startbildschirm
 
 - Ist die **Messanzeige** an, zeigt Kipp-Start oben rechts die Bilder des Startbildschirms selbst: Bilder pro Sekunde, wie viele davon ihren Anzeigetermin verpasst haben („ruckelig“) und die mittlere Zeit pro Bild – gemessen mit Androids Frame-Metriken, jeweils über eine Sekunde. Oben links bleibt die Anzeige des Hintergrunds.

@@ -20,6 +20,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -55,7 +56,7 @@ final class DrawerView extends FrameLayout {
         this.iconSize = iconSize;
         density = context.getResources().getDisplayMetrics().density;
         slop = ViewConfiguration.get(context).getScaledTouchSlop();
-        setBackgroundColor(0xE6101418);
+        setBackgroundColor(0xF01E2023); // 0.24: Grafit wie der Einstellungs-Bildschirm
         setClickable(true);
         setVisibility(GONE);
 
@@ -68,18 +69,30 @@ final class DrawerView extends FrameLayout {
         search.setSingleLine(true);
         search.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         search.setImeOptions(EditorInfo.IME_ACTION_GO);
-        search.setTextColor(Color.WHITE);
-        search.setHintTextColor(0x99FFFFFF);
+        search.setTextColor(KippStyle.TEXT);
+        search.setHintTextColor(KippStyle.SUB);
         search.setTextSize(16);
         search.setGravity(Gravity.CENTER_VERTICAL);
-        GradientDrawable pill = new GradientDrawable();
-        pill.setColor(0x33FFFFFF);
-        pill.setCornerRadius(24 * density);
-        search.setBackground(pill);
+        search.setBackground(KippStyle.inset(24 * density, density));
+        search.setCompoundDrawablePadding(Math.round(10 * density));
+        android.graphics.drawable.ShapeDrawable dot = new android.graphics.drawable.ShapeDrawable(new android.graphics.drawable.shapes.OvalShape());
+        dot.getPaint().setColor(KippStyle.COPPER);
+        dot.setIntrinsicWidth(Math.round(8 * density));
+        dot.setIntrinsicHeight(Math.round(8 * density));
+        search.setCompoundDrawablesRelativeWithIntrinsicBounds(dot, null, null, null);
         int pad = Math.round(18 * density);
         search.setPadding(pad, 0, pad, 0);
         LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.round(48 * density));
         searchParams.setMargins(Math.round(20 * density), Math.round(12 * density), Math.round(20 * density), Math.round(12 * density));
+        TextView heading = new TextView(context);
+        heading.setText("ALLE APPS");
+        heading.setTextSize(12);
+        heading.setLetterSpacing(.12f);
+        heading.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        heading.setTextColor(KippStyle.COPPER);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        headingParams.setMargins(Math.round(24 * density), Math.round(14 * density), 0, 0);
+        column.addView(heading, headingParams);
         column.addView(search, searchParams);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}

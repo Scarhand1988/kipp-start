@@ -61,18 +61,14 @@ final class SettingsSheet extends FrameLayout {
         card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setClickable(true);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(0xF21C2024);
-        float r = 28 * density;
-        background.setCornerRadii(new float[] {r, r, r, r, 0, 0, 0, 0});
-        card.setBackground(background);
+        card.setBackground(KippStyle.sheet(32 * density)); // 0.24: Grafit und Kupfer
         int pad = Math.round(22 * density);
         card.setPadding(pad, Math.round(10 * density), pad, pad);
         scroll.addView(card, new ScrollView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         View handle = new View(context);
         GradientDrawable handleShape = new GradientDrawable();
-        handleShape.setColor(0x66FFFFFF);
+        handleShape.setColor(0xFF4A4D52);
         handleShape.setCornerRadius(2 * density);
         handle.setBackground(handleShape);
         LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(Math.round(40 * density), Math.round(4 * density));
@@ -80,14 +76,14 @@ final class SettingsSheet extends FrameLayout {
         handleParams.bottomMargin = Math.round(14 * density);
         card.addView(handle, handleParams);
 
-        TextView title = text("Startbildschirm", 20, Color.WHITE);
+        TextView title = text("Startbildschirm", 20, KippStyle.TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, 0, 0, Math.round(10 * density));
         card.addView(title);
 
         // 0.18: Alle Schalter liegen jetzt im gemeinsamen Einstellungs-Bildschirm (Kippen / Blättern / Foto);
         // hier bleiben nur Dinge, die diesen Startbildschirm direkt betreffen.
-        action("Alle Einstellungen", callbacks::onOpenWallpaperSettings);
+        primary("Alle Einstellungen", callbacks::onOpenWallpaperSettings);
         action("Jetzige Haltung als gerade", callbacks::onSetNeutral);
         action("Diese Seite als Startseite", callbacks::onSetDefaultPage);
         action("Widget hinzufügen", callbacks::onAddWidget);
@@ -103,10 +99,27 @@ final class SettingsSheet extends FrameLayout {
         return view;
     }
 
+    /** Großer Kupfer-Knopf wie im Einstellungs-Bildschirm. */
+    private void primary(String label, Runnable run) {
+        TextView view = text(label, 16, KippStyle.ON_COPPER);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setGravity(Gravity.CENTER);
+        view.setBackground(KippStyle.copper(25 * density));
+        view.setOnClickListener(v -> {
+            close();
+            run.run();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.round(52 * density));
+        params.bottomMargin = Math.round(8 * density);
+        card.addView(view, params);
+    }
+
     private void action(String label, Runnable run) {
-        TextView view = text(label, 16, 0xFF8AB4F8);
-        view.setMinHeight(Math.round(48 * density));
+        TextView view = text(label, 16, KippStyle.COPPER);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setMinHeight(Math.round(52 * density));
         view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setBackground(KippStyle.divider(density));
         view.setOnClickListener(v -> {
             close();
             run.run();
