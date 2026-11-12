@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.26 – App-Menü mit Schnellaktionen
+
+- **Lange auf eine App drücken** (Startbildschirm oder Dock) öffnet ein Menü über dem Symbol: bis zu 4 Schnellaktionen der App (z. B. „Neue Nachricht“, „Selfie aufnehmen“ – je nach App), **App-Info** und **Entfernen** (mit Rückgängig).
+- Wer nach dem langen Drücken weiterzieht, verschiebt das Symbol wie bisher; das Menü verschwindet dabei.
+- Schnellaktionen gibt Android nur dem Standard-Startbildschirm heraus – ist Kipp-Start nicht als Start-App gewählt, zeigt das Menü nur App-Info und Entfernen.
+
 ## 0.25 – Rückgängig
 
 - Nach jedem Verschieben oder Entfernen von Symbolen, Dock-Apps und Widgets erscheint unten 5 Sekunden lang „Verschoben / Entfernt · **Rückgängig**“. Antippen stellt den Stand davor wieder her.

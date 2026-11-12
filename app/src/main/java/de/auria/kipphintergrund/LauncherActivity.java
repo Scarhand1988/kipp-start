@@ -461,6 +461,137 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         drag.kind = icon.item != null ? Drag.HOME : icon.dockSlot >= 0 ? Drag.DOCK : Drag.DRAWER;
         v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
         root.startDrag(drag, icon.app.icon, iconSize, iconSize, v);
+        // 0.26: Menü mit Schnellaktionen; wer weiterzieht, verschiebt (Menü verschwindet)
+        if (drag.kind != Drag.DRAWER) showAppMenu(icon, drag);
+        return true;
+    }
+
+    // ---------- App-Menü (0.26) ----------
+
+    private FrameLayout menuScrim;
+
+    private void showAppMenu(IconView icon, Drag drag) {
+        closeAppMenu();
+        menuScrim = new FrameLayout(this);
+        menuScrim.setOnClickListener(v -> closeAppMenu());
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable shape = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] {KippStyle.SHEET_TOP, KippStyle.SHEET_BOTTOM});
+        shape.setCornerRadius(dp(22));
+        shape.setStroke(Math.max(1, dp(1)), 0x33D9A066);
+        card.setBackground(shape);
+        card.setElevation(dp(12));
+        card.setPadding(dp(6), dp(6), dp(6), dp(6));
+        card.setClickable(true);
+
+        for (android.content.pm.ShortcutInfo shortcut : shortcutsFor(icon.app)) {
+            android.graphics.drawable.Drawable image = null;
+            try {
+                image = launcherApps.getShortcutIconDrawable(shortcut, getResources().getDisplayMetrics().densityDpi);
+            } catch (RuntimeException ignored) {}
+            CharSequence label = shortcut.getShortLabel() != null ? shortcut.getShortLabel() : shortcut.getLongLabel();
+            card.addView(menuRow(image, String.valueOf(label), KippStyle.TEXT, () -> {
+                try {
+                    launcherApps.startShortcut(shortcut, null, null);
+                } catch (RuntimeException e) {
+                    toast("Schnellaktion lässt sich nicht starten.");
+                }
+            }));
+        }
+        card.addView(menuRow(null, "App-Info", KippStyle.COPPER, () -> showInfo(drag)));
+        card.addView(menuRow(null, "Entfernen", KippStyle.COPPER, () -> {
+            HomeModel before = model.copy();
+            removeDragged(drag);
+            model.trimPages();
+            model.save(this);
+            bindAll();
+            offerUndo(before, "Entfernt");
+        }));
+        TextView hint = new TextView(this);
+        hint.setText("Zum Verschieben gedrückt halten und ziehen");
+        hint.setTextSize(11);
+        hint.setTextColor(KippStyle.SUB);
+        hint.setPadding(dp(14), dp(4), dp(14), dp(6));
+        card.addView(hint);
+
+        int width = dp(236);
+        int[] at = new int[2];
+        icon.getLocationInWindow(at);
+        card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
+        int height = card.getMeasuredHeight();
+        int x = Math.max(dp(12), Math.min(root.getWidth() - width - dp(12), at[0] + icon.getWidth() / 2 - width / 2));
+        int above = at[1] - height - dp(8);
+        int y = above >= insetTop + dp(8) ? above : at[1] + icon.getHeight() + dp(8);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = x;
+        params.topMargin = Math.min(y, root.getHeight() - height - dp(12));
+        menuScrim.addView(card, params);
+        root.addView(menuScrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        card.setAlpha(0f);
+        card.setScaleX(.92f);
+        card.setScaleY(.92f);
+        card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start();
+    }
+
+    private View menuRow(android.graphics.drawable.Drawable image, String label, int color, Runnable action) {
+        TextView row = new TextView(this);
+        row.setText(label);
+        row.setTextSize(15);
+        row.setTextColor(color);
+        row.setSingleLine(true);
+        row.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinHeight(dp(48));
+        row.setPadding(dp(14), 0, dp(14), 0);
+        if (image != null) {
+            image.setBounds(0, 0, dp(24), dp(24));
+            row.setCompoundDrawablesRelative(image, null, null, null);
+            row.setCompoundDrawablePadding(dp(12));
+        }
+        GradientDrawable pressed = new GradientDrawable();
+        pressed.setColor(0x22D9A066);
+        pressed.setCornerRadius(dp(14));
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] {android.R.attr.state_pressed}, pressed);
+        row.setBackground(states);
+        row.setOnClickListener(v -> {
+            closeAppMenu();
+            action.run();
+        });
+        return row;
+    }
+
+    /** Bis zu 4 Schnellaktionen der App (geht nur, solange Kipp-Start der Standard-Startbildschirm ist). */
+    private List<android.content.pm.ShortcutInfo> shortcutsFor(AppIndex.App app) {
+        ArrayList<android.content.pm.ShortcutInfo> result = new ArrayList<>();
+        try {
+            if (!launcherApps.hasShortcutHostPermission()) return result;
+            LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery();
+            query.setPackage(app.component.getPackageName());
+            query.setActivity(app.component);
+            query.setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC | LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST);
+            List<android.content.pm.ShortcutInfo> found = launcherApps.getShortcuts(query, app.user);
+            if (found == null) return result;
+            ArrayList<android.content.pm.ShortcutInfo> sorted = new ArrayList<>(found);
+            // Feste (Manifest-)Aktionen zuerst, dann nach Rang – wie der Pixel-Startbildschirm
+            sorted.sort((a, b) -> a.isDeclaredInManifest() != b.isDeclaredInManifest()
+                    ? (a.isDeclaredInManifest() ? -1 : 1) : Integer.compare(a.getRank(), b.getRank()));
+            for (android.content.pm.ShortcutInfo info : sorted) {
+                if (!info.isEnabled()) continue;
+                result.add(info);
+                if (result.size() == 4) break;
+            }
+        } catch (RuntimeException ignored) {
+            // z. B. kein Zugriff: dann nur App-Info und Entfernen
+        }
+        return result;
+    }
+
+    private boolean closeAppMenu() {
+        if (menuScrim == null) return false;
+        root.removeView(menuScrim);
+        menuScrim = null;
         return true;
     }
 
@@ -641,9 +772,16 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             return drag != null;
         }
 
+        private float startX;
+        private float startY;
+        private boolean moved;
+
         void startDrag(Drag d, Bitmap image, int width, int height, View source) {
             if (drag != null) endDrag();
             drag = d;
+            startX = lastX;
+            startY = lastY;
+            moved = false;
             int[] location = new int[2];
             source.getLocationInWindow(location);
             if (d.kind == Drag.WIDGET) {
@@ -710,13 +848,19 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             if (drag == null) return false;
             switch (ev.getActionMasked()) {
                 case MotionEvent.ACTION_MOVE:
+                    if (!moved && Math.hypot(ev.getX() - startX, ev.getY() - startY) > dp(10)) {
+                        moved = true;
+                        closeAppMenu(); // weitergezogen: verschieben statt Menü
+                    }
                     floating.setX(ev.getX() - grabX);
                     floating.setY(ev.getY() - grabY);
                     highlight(ev.getX(), ev.getY());
                     trackEdge(ev.getX());
                     break;
                 case MotionEvent.ACTION_UP:
-                    drop(ev.getX(), ev.getY());
+                    // Nur lange gedrückt, nicht bewegt: Symbol bleibt, das Menü bleibt offen
+                    if (!moved && menuScrim != null) cancel();
+                    else drop(ev.getX(), ev.getY());
                     break;
                 case MotionEvent.ACTION_CANCEL:
                     cancel();
@@ -1137,7 +1281,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (!Intent.ACTION_MAIN.equals(intent.getAction())) return;
-        boolean closed = false;
+        boolean closed = closeAppMenu();
         if (root.isDragging()) {
             root.cancel();
             closed = true;
@@ -1155,6 +1299,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override public void onBackPressed() {
         // Der Startbildschirm schließt sich nie; Zurück schließt nur Übersicht und Einstellungen
+        if (closeAppMenu()) return;
         if (root.isDragging()) root.cancel();
         else if (sheet.isOpen()) sheet.close();
         else if (drawer.isOpen()) drawer.close(true);
