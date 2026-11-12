@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.21 – Hintergrund zeichnet im eigenen Thread
+
+- **Eigener Zeichen-Thread mit eigenem Bildtakt** für den Kipp-Hintergrund. Vorher zeichneten Hintergrund und Startbildschirm beide im Haupt-Thread; jedes Hintergrundbild kostete dem Startbildschirm Zeit beim Wischen und Antippen.
+- Zeichnen und das Austauschen/Freigeben von Bildern sind gegeneinander gesperrt; Fotowechsel laufen im Zeichen-Thread, Farbmeldung und Sensor weiter im Haupt-Thread.
+- `TiltBus` darf jetzt aus jedem Thread melden; der Startbildschirm bekommt die Werte gebündelt im Haupt-Thread.
+
 ## 0.20 – Live-Vorschau bewegt sich
 
 - **Echte Live-Vorschau:** Das Foto oben im Einstellungs-Bildschirm bewegt sich jetzt beim Kippen genau wie der Hintergrund und verschwimmt mit der eingestellten Kipp-Unschärfe. Vorher war es ein stehendes Bild. Im Reiter Foto steht es still, damit sich der Ausschnitt genau einstellen lässt.

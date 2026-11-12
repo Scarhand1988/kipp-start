@@ -51,7 +51,13 @@ public final class TiltWallpaperService extends WallpaperService {
 
     private final class TiltEngine extends Engine implements SensorEventListener, SharedPreferences.OnSharedPreferenceChangeListener {
         private final Handler main = new Handler(Looper.getMainLooper());
-        private final Choreographer frames = Choreographer.getInstance();
+        // 0.21: Zeichnen im eigenen Thread mit eigenem Bildtakt – der Startbildschirm im Haupt-Thread
+        // wird beim Wischen nicht mehr vom Hintergrund ausgebremst
+        private Choreographer frames;
+        private HandlerThread drawThread;
+        private Handler drawHandler;
+        /** Zeichnen und Austausch/Freigabe der Bilder schließen sich gegenseitig aus. */
+        private final Object drawLock = new Object();
         private final Choreographer.FrameCallback renderFrame = this::onFrame;
         private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final Paint gradientPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -87,13 +93,13 @@ public final class TiltWallpaperService extends WallpaperService {
         private Sensor sensor;
         private HandlerThread sensorThread;
         private Handler sensorHandler;
-        private Bitmap photo;
-        private Bitmap softPhoto;
+        private volatile Bitmap photo;
+        private volatile Bitmap softPhoto;
         private WallpaperColors colors;
         private volatile boolean visible;
         private volatile boolean surfaceReady;
         private volatile boolean listening;
-        private boolean destroyed;
+        private volatile boolean destroyed;
         private volatile float blurStrength = SoftFocus.DEFAULT_STRENGTH;
         private int softGeneration;
         private volatile boolean enabled = true;
@@ -116,13 +122,13 @@ public final class TiltWallpaperService extends WallpaperService {
             scheduleFrame();
         };
         // Seitenwechsel: 0 = auf einer Seite, 1 = mitten zwischen zwei Seiten
-        private float pageSwipe;
+        private volatile float pageSwipe;
         // Entsperr-Animation
         private boolean armed;            // Bildschirm war aus: beim nächsten Entsperren abspielen
         private long presentAt;           // Zeitpunkt des Entsperrens (0 = noch nicht gemeldet)
-        private boolean unlocking;
-        private long unlockStart;         // 0 = startet mit dem nächsten Bildtakt
-        private float unlockAmount;       // 1 = Anfang, 0 = fertig
+        private volatile boolean unlocking;
+        private volatile long unlockStart;         // 0 = startet mit dem nächsten Bildtakt
+        private volatile float unlockAmount;       // 1 = Anfang, 0 = fertig
         private boolean receiverRegistered;
         private KeyguardManager keyguard;
         private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
@@ -155,7 +161,7 @@ public final class TiltWallpaperService extends WallpaperService {
         private float positionX;
         private float positionY;
         private float systemMaxScale = MotionMath.DEFAULT_SYSTEM_SCALE;
-        private float zoomOut;
+        private volatile float zoomOut;
         private float maxRefreshRate;
 
         @Override public void onCreate(SurfaceHolder holder) {
@@ -172,6 +178,22 @@ public final class TiltWallpaperService extends WallpaperService {
             sensorThread = new HandlerThread("kipp-sensor");
             sensorThread.start();
             sensorHandler = new Handler(sensorThread.getLooper());
+            drawThread = new HandlerThread("kipp-draw");
+            drawThread.start();
+            drawHandler = new Handler(drawThread.getLooper());
+            java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
+            drawHandler.post(() -> {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY);
+                } catch (RuntimeException ignored) {}
+                frames = Choreographer.getInstance(); // Bildtakt dieses Threads
+                ready.countDown();
+            });
+            try {
+                if (!ready.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)) frames = Choreographer.getInstance();
+            } catch (InterruptedException e) {
+                frames = Choreographer.getInstance();
+            }
             systemMaxScale = PhotoStore.systemWallpaperScale();
             maxRefreshRate = readMaxRefreshRate();
             keyguard = getSystemService(KeyguardManager.class);
@@ -234,7 +256,9 @@ public final class TiltWallpaperService extends WallpaperService {
         @Override public void onSurfaceRedrawNeeded(SurfaceHolder holder) { draw(); }
 
         @Override public void onSurfaceDestroyed(SurfaceHolder holder) {
-            surfaceReady = false;
+            synchronized (drawLock) {
+                surfaceReady = false; // wartet, bis ein laufendes Bild fertig ist
+            }
             stopFrames();
             syncSensor();
             super.onSurfaceDestroyed(holder);
@@ -268,11 +292,14 @@ public final class TiltWallpaperService extends WallpaperService {
                 receiverRegistered = false;
             }
             sensorThread.quitSafely();
-            retire(photo);
-            retire(softPhoto);
-            photo = null;
-            softPhoto = null;
-            recycleRetired();
+            synchronized (drawLock) {
+                retire(photo);
+                retire(softPhoto);
+                photo = null;
+                softPhoto = null;
+                recycleRetired();
+            }
+            drawThread.quitSafely();
             super.onDestroy();
         }
 
@@ -388,7 +415,7 @@ public final class TiltWallpaperService extends WallpaperService {
                 Bitmap ready = sharp;
                 Bitmap readySoft = soft;
                 WallpaperColors readyColors = palette;
-                main.post(() -> {
+                drawHandler.post(() -> {
                     if (destroyed || generation != imageGeneration) {
                         // Inzwischen überholt: nie gezeichnet, sofort freigeben
                         if (ready != null) ready.recycle();
@@ -404,8 +431,11 @@ public final class TiltWallpaperService extends WallpaperService {
                         readySoft.recycle();
                     }
                     colors = readyColors;
-                    if (colors != null) notifyColorsChanged();
-                    syncSensor();
+                    main.post(() -> {
+                        if (destroyed) return;
+                        if (colors != null) notifyColorsChanged();
+                        syncSensor();
+                    });
                     scheduleFrame();
                 });
             });
@@ -418,7 +448,7 @@ public final class TiltWallpaperService extends WallpaperService {
             boolean needed = softNeeded();
             loader.execute(() -> {
                 Bitmap soft = needed ? buildSoft(strength) : null;
-                main.post(() -> {
+                drawHandler.post(() -> {
                     if (destroyed || gen != softGeneration) {
                         if (soft != null) soft.recycle();
                         return;
@@ -463,10 +493,18 @@ public final class TiltWallpaperService extends WallpaperService {
 
         /** Ersetztes Bild merken; freigegeben wird es erst, nachdem das neue einmal gezeichnet ist. */
         private void retire(Bitmap bitmap) {
-            if (bitmap != null && !retired.contains(bitmap)) retired.add(bitmap);
+            synchronized (drawLock) {
+                if (bitmap != null && !retired.contains(bitmap)) retired.add(bitmap);
+            }
         }
 
         private void recycleRetired() {
+            synchronized (drawLock) {
+                recycleRetiredLocked();
+            }
+        }
+
+        private void recycleRetiredLocked() {
             if (retired.isEmpty()) return;
             for (Bitmap bitmap : retired) {
                 if (bitmap != photo && bitmap != softPhoto) bitmap.recycle();
@@ -551,6 +589,12 @@ public final class TiltWallpaperService extends WallpaperService {
         }
 
         private void draw() {
+            synchronized (drawLock) {
+                drawLocked();
+            }
+        }
+
+        private void drawLocked() {
             if (!surfaceReady) return;
             SurfaceHolder holder = getSurfaceHolder();
             Canvas canvas;
