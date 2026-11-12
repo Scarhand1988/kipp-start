@@ -380,6 +380,19 @@ public final class MotionCheck {
         require(darkPx <= 26, "Dunkle Stellen bleiben wie im Video dunkel (" + darkPx + ")");
         require(Effects.frostDim(.5f) > .3f, "Schon bei halber Neigung deutlich dunkler, wie im Video");
 
+        // 0.22 – Ruhemodus des Sensors
+        float[] still = {0f, 0f, 0f, 1f};
+        float half = (float) Math.sin(Math.toRadians(.25) / 2), whole = (float) Math.cos(Math.toRadians(.25) / 2);
+        require(MotionMath.quatDelta(still, still) == 0f, "Keine Drehung = keine Bewegung");
+        require(!MotionMath.moved(still, new float[] {half, 0f, 0f, whole}), "Zittern unter 0,5° weckt den Sensor nicht");
+        float h2 = (float) Math.sin(Math.toRadians(1.5) / 2), w2 = (float) Math.cos(Math.toRadians(1.5) / 2);
+        require(MotionMath.moved(still, new float[] {0f, h2, 0f, w2}), "1,5° Kippen weckt ihn sofort");
+        require(MotionMath.moved(new float[] {0f, 0f, 0f, -1f}, new float[] {h2, 0f, 0f, w2}),
+                "Gleiche Lage mit umgekehrtem Vorzeichen zählt nicht als Sprung, echte Drehung schon");
+        require(!MotionMath.moved(new float[] {0f, 0f, 0f, -1f}, still), "q und −q sind dieselbe Lage");
+        require(MotionMath.REST_AFTER_MS >= 2000 && MotionMath.REST_INTERVAL_US <= 50_000,
+                "Ruhe erst nach ein paar Sekunden, dann noch mindestens 20 Messungen pro Sekunde");
+
         System.out.println("OK: " + passed + " Prüfungen – Totzone, Glättung, Bildausschnitte mit/ohne System-Vergrößerung, "
                 + "kein Zoom beim Kippen, Nachführen der Ruhestellung, Körperdrehung, 90°-Grenze, Reaktionszeit, "
                 + "weicher Fokus ohne Klötzchen, einstellbare Unschärfe, "

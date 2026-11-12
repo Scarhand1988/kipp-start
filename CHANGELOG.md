@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 0.22 – Sensor-Ruhemodus
+
+- Liegt das Handy etwa 2,5 Sekunden still (Drehung unter ca. 0,75°), liest der Hintergrund den Lagesensor nur noch 25-mal statt 100-mal pro Sekunde. Bei der ersten spürbaren Drehung schaltet er sofort zurück. Spart Akku, wenn das Handy auf dem Tisch liegt.
+- `MotionCheck` prüft die Ruhe-Erkennung (`MotionMath.quatDelta`, `moved`).
+
 ## 0.21 – Hintergrund zeichnet im eigenen Thread
 
 - **Eigener Zeichen-Thread mit eigenem Bildtakt** für den Kipp-Hintergrund. Vorher zeichneten Hintergrund und Startbildschirm beide im Haupt-Thread; jedes Hintergrundbild kostete dem Startbildschirm Zeit beim Wischen und Antippen.

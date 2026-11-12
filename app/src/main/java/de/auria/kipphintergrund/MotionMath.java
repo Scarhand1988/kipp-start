@@ -17,6 +17,25 @@ final class MotionMath {
         return magnitude == 0 ? 0 : Math.copySign(magnitude, radians);
     }
 
+    // 0.22 – Ruhemodus: liegt das Handy still, liest der Hintergrund den Lagesensor seltener (spart Akku)
+    static final long REST_AFTER_MS = 2500;
+    static final int REST_INTERVAL_US = 40_000;   // 25 Messungen pro Sekunde statt 100
+    static final int ACTIVE_INTERVAL_US = 10_000;
+    private static final float MOVE_DELTA = .0065f; // ≈ 0,75° Drehung
+
+    /** Abstand zweier Lage-Quaternionen (x, y, z[, w]); q und −q gelten als gleich. */
+    static float quatDelta(float[] a, float[] b) {
+        float aw = a.length > 3 ? a[3] : (float) Math.sqrt(Math.max(0, 1 - a[0] * a[0] - a[1] * a[1] - a[2] * a[2]));
+        float bw = b.length > 3 ? b[3] : (float) Math.sqrt(Math.max(0, 1 - b[0] * b[0] - b[1] * b[1] - b[2] * b[2]));
+        float dot = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + aw * bw);
+        return (float) Math.sqrt(Math.max(0, 1 - Math.min(1f, dot * dot)));
+    }
+
+    /** Hat sich das Handy seit der Bezugslage spürbar gedreht? */
+    static boolean moved(float[] reference, float[] now) {
+        return quatDelta(reference, now) > MOVE_DELTA;
+    }
+
     static float approach(float current, float target, float seconds) {
         float blend = 1f - (float) Math.exp(-seconds / .019f);
         float next = current + (target - current) * blend;

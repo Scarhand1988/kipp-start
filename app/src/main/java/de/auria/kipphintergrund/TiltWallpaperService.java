@@ -317,10 +317,16 @@ public final class TiltWallpaperService extends WallpaperService {
                 } else {
                     sensorHandler.post(tracker::reset);
                 }
-                listening = sensors.registerListener(this, sensor, 10_000, 0, sensorHandler);
+                synchronized (sensorLock) {
+                    resting = false;
+                    restRefValid = false;
+                    listening = sensors.registerListener(this, sensor, MotionMath.ACTIVE_INTERVAL_US, 0, sensorHandler);
+                }
             } else {
-                sensors.unregisterListener(this);
-                listening = false;
+                synchronized (sensorLock) {
+                    sensors.unregisterListener(this);
+                    listening = false;
+                }
             }
         }
 
@@ -513,8 +519,40 @@ public final class TiltWallpaperService extends WallpaperService {
         }
 
         // Läuft im Sensor-Thread
+        // 0.22 – Ruhemodus (nur Sensor-Thread, An-/Abmelden unter sensorLock)
+        private final Object sensorLock = new Object();
+        private final float[] restRef = new float[4];
+        private boolean restRefValid;
+        private boolean resting;
+        private long lastMoveNanos;
+
+        /** Liegt das Handy ein paar Sekunden still, seltener messen; bei der ersten Drehung sofort wieder schnell. */
+        private void checkRest(SensorEvent event) {
+            float[] v = event.values;
+            if (!restRefValid || MotionMath.moved(restRef, v)) {
+                System.arraycopy(v, 0, restRef, 0, Math.min(4, v.length));
+                if (v.length < 4) restRef[3] = (float) Math.sqrt(Math.max(0, 1 - v[0] * v[0] - v[1] * v[1] - v[2] * v[2]));
+                restRefValid = true;
+                lastMoveNanos = event.timestamp;
+                if (resting) setSensorRate(false);
+            } else if (!resting && event.timestamp - lastMoveNanos > MotionMath.REST_AFTER_MS * 1_000_000L) {
+                setSensorRate(true);
+            }
+        }
+
+        private void setSensorRate(boolean rest) {
+            synchronized (sensorLock) {
+                if (!listening) return;
+                sensors.unregisterListener(this);
+                resting = rest;
+                listening = sensors.registerListener(this, sensor,
+                        rest ? MotionMath.REST_INTERVAL_US : MotionMath.ACTIVE_INTERVAL_US, 0, sensorHandler);
+            }
+        }
+
         @Override public void onSensorChanged(SensorEvent event) {
             if (!listening) return;
+            checkRest(event);
             tracker.update(event.values, event.timestamp);
             if (!listening) return; // während der Berechnung abgeschaltet
             sensorNanos = event.timestamp;
