@@ -105,58 +105,69 @@ final class HomeModel {
         }
         try {
             JSONObject json = new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));
-            model.pages = Math.max(1, Math.min(MAX_PAGES, json.optInt("pages", 1)));
-            model.defaultPage = Math.max(0, Math.min(model.pages - 1, json.optInt("defaultPage", 0)));
-            JSONArray items = json.optJSONArray("items");
-            if (items != null) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject o = items.optJSONObject(i);
-                    if (o == null) continue;
-                    Item item = new Item();
-                    item.type = o.optInt("type", Item.APP);
-                    item.page = o.optInt("page", 0);
-                    item.x = o.optInt("x", 0);
-                    item.y = o.optInt("y", 0);
-                    item.w = Math.max(1, o.optInt("w", 1));
-                    item.h = Math.max(1, o.optInt("h", 1));
-                    if (item.type == Item.APP) {
-                        item.component = ComponentName.unflattenFromString(o.optString("component", ""));
-                        if (item.component == null) continue;
-                    } else if (item.type == Item.FOLDER) {
-                        item.w = 1;
-                        item.h = 1;
-                        item.title = o.optString("title", "");
-                        JSONArray apps = o.optJSONArray("apps");
-                        for (int j = 0; apps != null && j < apps.length(); j++) {
-                            ComponentName c = ComponentName.unflattenFromString(apps.optString(j, ""));
-                            if (c != null && !item.folder.contains(c)) item.folder.add(c);
-                        }
-                        if (item.folder.isEmpty()) continue;
-                        if (item.folder.size() == 1) {
-                            item.type = Item.APP;
-                            item.component = item.folder.get(0);
-                            item.folder.clear();
-                        }
-                    } else {
-                        item.widgetId = o.optInt("widget", -1);
-                        if (item.widgetId < 0) continue;
-                    }
-                    if (item.page < 0 || item.page >= model.pages) continue;
-                    model.items.add(item);
-                }
-            }
-            JSONArray dock = json.optJSONArray("dock");
-            if (dock != null) {
-                for (int i = 0; i < LauncherMath.DOCK && i < dock.length(); i++) {
-                    String value = dock.optString(i, "");
-                    model.dock[i] = value.isEmpty() ? null : ComponentName.unflattenFromString(value);
-                }
-            }
+            fill(model, json);
         } catch (IOException | JSONException | RuntimeException e) {
             model.items.clear();
             model.fresh = true;
         }
         return model;
+    }
+
+    /** 0.28: Aufbau aus JSON (Datei oder Sicherung). */
+    static HomeModel fromJson(JSONObject json) {
+        HomeModel model = new HomeModel();
+        fill(model, json);
+        return model;
+    }
+
+    private static void fill(HomeModel model, JSONObject json) {
+        model.pages = Math.max(1, Math.min(MAX_PAGES, json.optInt("pages", 1)));
+        model.defaultPage = Math.max(0, Math.min(model.pages - 1, json.optInt("defaultPage", 0)));
+        JSONArray items = json.optJSONArray("items");
+        if (items != null) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject o = items.optJSONObject(i);
+                if (o == null) continue;
+                Item item = new Item();
+                item.type = o.optInt("type", Item.APP);
+                item.page = o.optInt("page", 0);
+                item.x = o.optInt("x", 0);
+                item.y = o.optInt("y", 0);
+                item.w = Math.max(1, o.optInt("w", 1));
+                item.h = Math.max(1, o.optInt("h", 1));
+                if (item.type == Item.APP) {
+                    item.component = ComponentName.unflattenFromString(o.optString("component", ""));
+                    if (item.component == null) continue;
+                } else if (item.type == Item.FOLDER) {
+                    item.w = 1;
+                    item.h = 1;
+                    item.title = o.optString("title", "");
+                    JSONArray apps = o.optJSONArray("apps");
+                    for (int j = 0; apps != null && j < apps.length(); j++) {
+                        ComponentName c = ComponentName.unflattenFromString(apps.optString(j, ""));
+                        if (c != null && !item.folder.contains(c)) item.folder.add(c);
+                    }
+                    if (item.folder.isEmpty()) continue;
+                    if (item.folder.size() == 1) {
+                        item.type = Item.APP;
+                        item.component = item.folder.get(0);
+                        item.folder.clear();
+                    }
+                } else {
+                    item.widgetId = o.optInt("widget", -1);
+                    if (item.widgetId < 0) continue;
+                }
+                if (item.page < 0 || item.page >= model.pages) continue;
+                model.items.add(item);
+            }
+        }
+        JSONArray dock = json.optJSONArray("dock");
+        if (dock != null) {
+            for (int i = 0; i < LauncherMath.DOCK && i < dock.length(); i++) {
+                String value = dock.optString(i, "");
+                model.dock[i] = value.isEmpty() ? null : ComponentName.unflattenFromString(value);
+            }
+        }
     }
 
     /** 0.25: unabhängige Kopie für „Rückgängig“. */

@@ -179,6 +179,23 @@ public final class LauncherCheck {
         }
         require(gw == 4 && gh == 4, "Wachsen stoppt sauber am Rand (" + gw + "×" + gh + ")");
 
-        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe.");
+        // 0.28 – Sicherung
+        require(LauncherMath.backupReadable("kipp-start-sicherung", 1, "kipp-start-sicherung", 1), "Eigene Sicherung lesbar");
+        require(!LauncherMath.backupReadable("kipp-start-sicherung", 2, "kipp-start-sicherung", 1), "Neuere Fassung abgelehnt");
+        require(!LauncherMath.backupReadable("kipp-start-sicherung", 0, "kipp-start-sicherung", 1), "Ohne Fassung abgelehnt");
+        require(!LauncherMath.backupReadable("", 1, "kipp-start-sicherung", 1)
+                && !LauncherMath.backupReadable(null, 1, "kipp-start-sicherung", 1), "Fremde Datei abgelehnt");
+        boolean[][] page = new boolean[LauncherMath.COLUMNS][LauncherMath.ROWS];
+        int[] spot = LauncherMath.restoreSpot(page, 0, 0, 4, 2);
+        require(spot != null && spot[0] == 0 && spot[1] == 0, "Widget kommt an seinen alten Platz");
+        page[0][0] = true;
+        spot = LauncherMath.restoreSpot(page, 0, 0, 4, 2);
+        require(spot != null && spot[0] == 0 && spot[1] == 1, "Alter Platz belegt: nächster freier");
+        spot = LauncherMath.restoreSpot(page, 3, 5, 2, 2);
+        require(spot != null && LauncherMath.fits(page, spot[0], spot[1], 2, 2), "Platz außerhalb des Rasters wird ersetzt");
+        for (int x = 0; x < LauncherMath.COLUMNS; x++) for (int y = 0; y < LauncherMath.ROWS; y++) page[x][y] = true;
+        require(LauncherMath.restoreSpot(page, 0, 0, 1, 1) == null, "Volle Seite: kein Platz");
+
+        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe, Sicherung.");
     }
 }

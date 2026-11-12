@@ -32,6 +32,9 @@ final class SettingsSheet extends FrameLayout {
         void onOpenWallpaperSettings();
 
         void onChooseHomeApp();
+
+        /** 0.28: Sichern und Wiederherstellen. */
+        void onBackupMenu();
     }
 
     static final String TILT = "tilt";
@@ -88,6 +91,7 @@ final class SettingsSheet extends FrameLayout {
         action("Diese Seite als Startseite", callbacks::onSetDefaultPage);
         action("Widget hinzufügen", callbacks::onAddWidget);
         action("Symbole neu laden", callbacks::onReloadIcons);
+        action("Sichern und Wiederherstellen", callbacks::onBackupMenu);
         action("Anderen Startbildschirm wählen", callbacks::onChooseHomeApp);
     }
 

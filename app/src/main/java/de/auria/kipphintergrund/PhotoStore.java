@@ -158,4 +158,40 @@ final class PhotoStore {
                 .putFloat(ZOOM, 1f).putFloat(X, 0f).putFloat(Y, 0f)
                 .apply();
     }
+
+    /** 0.28: Foto als Bytes für die Sicherung (null, wenn keins da ist). */
+    static synchronized byte[] readImageBytes(Context context) {
+        AtomicFile file = imageFile(context);
+        try {
+            if (file.getBaseFile().exists()) return file.readFully();
+            File legacy = legacyFile(context);
+            return legacy.exists() ? Backup.readFile(legacy) : null;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 0.28: Foto aus einer Sicherung übernehmen. Prüft vorher, ob es sich als Bild lesen lässt. Setzt die Bild-Nummer
+     * noch nicht – das macht der Aufrufer, wenn auch die Einstellungen zurückgeschrieben sind.
+     */
+    static synchronized boolean importImageBytes(Context context, byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return false;
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false;
+        AtomicFile file = imageFile(context);
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(bytes);
+            file.finishWrite(out);
+        } catch (IOException e) {
+            if (out != null) file.failWrite(out);
+            return false;
+        }
+        legacyFile(context).delete();
+        return true;
+    }
 }

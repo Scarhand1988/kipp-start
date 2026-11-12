@@ -241,4 +241,17 @@ final class LauncherMath {
         if (!fits(used, x, y, nw, nh)) return null;
         return new int[] {nw, nh};
     }
+
+    // ---------- 0.28: Sicherung ----------
+
+    /** Sicherung lesbar: richtiges Format und keine neuere Fassung, als diese App kennt. */
+    static boolean backupReadable(String format, int version, String expectedFormat, int maxVersion) {
+        return format != null && format.equals(expectedFormat) && version >= 1 && version <= maxVersion;
+    }
+
+    /** Platz für ein wiederhergestelltes Widget: gespeicherter Platz, wenn frei, sonst der erste freie. {x, y} oder null. */
+    static int[] restoreSpot(boolean[][] used, int x, int y, int w, int h) {
+        if (fits(used, x, y, w, h)) return new int[] {x, y};
+        return firstFree(used, w, h, 0);
+    }
 }

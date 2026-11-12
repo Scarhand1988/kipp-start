@@ -61,6 +61,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private static final int HOST_ID = 2611;
     private static final int REQUEST_BIND = 41;
     private static final int REQUEST_CONFIGURE = 42;
+    private static final int REQUEST_EXPORT = 43;
+    private static final int REQUEST_IMPORT = 44;
+    private static final int REQUEST_RESTORE_BIND = 45;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -1408,6 +1411,311 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         return true;
     }
 
+    // ---------- Sichern und Wiederherstellen (0.28) ----------
+
+    private boolean backupWithPhoto;
+    private final java.util.ArrayDeque<Backup.WidgetSpot> restoreQueue = new java.util.ArrayDeque<>();
+    private Backup.WidgetSpot restoreSpot;
+    private int restoreId = -1;
+    private int restoreMissingWidgets;
+    private final ArrayList<String> restoreMissingApps = new ArrayList<>();
+    private boolean restoring;
+
+    @Override public void onBackupMenu() {
+        String[] choices = {"Sicherung erstellen – mit Foto", "Sicherung erstellen – ohne Foto", "Aus Sicherung wiederherstellen"};
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Sichern und Wiederherstellen")
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 2) startImport();
+                    else startExport(which == 0);
+                })
+                .setNegativeButton("Abbrechen", null)
+                .show();
+    }
+
+    private void startExport(boolean withPhoto) {
+        backupWithPhoto = withPhoto;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_TITLE, Backup.fileName());
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT);
+        } catch (ActivityNotFoundException e) {
+            toast("Android kann keinen Speicherort anbieten.");
+        }
+    }
+
+    private void startImport() {
+        if (restoring) {
+            toast("Eine Wiederherstellung läuft noch.");
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*")
+                .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/json", "application/octet-stream", "text/plain"});
+        try {
+            startActivityForResult(intent, REQUEST_IMPORT);
+        } catch (ActivityNotFoundException e) {
+            toast("Android kann keine Datei auswählen.");
+        }
+    }
+
+    private void exportTo(Uri uri) {
+        HomeModel snapshot = model.copy();
+        boolean withPhoto = backupWithPhoto;
+        Context context = getApplicationContext();
+        worker.execute(() -> {
+            String message;
+            try {
+                Backup.write(context, uri, snapshot, widgetManager, withPhoto);
+                message = withPhoto ? "Gesichert (mit Foto)." : "Gesichert (ohne Foto).";
+            } catch (java.io.IOException | org.json.JSONException | RuntimeException e) {
+                message = "Sichern hat nicht geklappt.";
+            }
+            String text = message;
+            main.post(() -> toast(text));
+        });
+    }
+
+    private void importFrom(Uri uri) {
+        Context context = getApplicationContext();
+        worker.execute(() -> {
+            Backup.Data data;
+            try {
+                data = Backup.read(context, uri);
+            } catch (org.json.JSONException e) {
+                main.post(() -> toast("Das ist keine Kipp-Start-Sicherung."));
+                return;
+            } catch (java.io.IOException | RuntimeException e) {
+                main.post(() -> toast("Die Datei lässt sich nicht lesen."));
+                return;
+            }
+            main.post(() -> confirmRestore(data));
+        });
+    }
+
+    private void confirmRestore(Backup.Data data) {
+        if (isDestroyed()) return;
+        int apps = 0;
+        int folders = 0;
+        for (HomeModel.Item item : data.home.items) {
+            if (item.type == HomeModel.Item.APP) apps++;
+            else if (item.type == HomeModel.Item.FOLDER) folders++;
+        }
+        StringBuilder text = new StringBuilder();
+        if (!data.created.isEmpty()) text.append("Gesichert am ").append(data.created.length() >= 10 ? data.created.substring(0, 10) : data.created);
+        if (!data.appVersion.isEmpty()) text.append(" mit Kipp-Start ").append(data.appVersion);
+        if (text.length() > 0) text.append(".\n\n");
+        text.append(data.home.pages).append(data.home.pages == 1 ? " Seite, " : " Seiten, ")
+                .append(apps).append(" Apps, ").append(folders).append(folders == 1 ? " Ordner, " : " Ordner, ")
+                .append(data.widgets.size()).append(" Widgets")
+                .append(data.photo != null ? ", mit Foto" : ", ohne Foto").append(".\n\n")
+                .append("Das ersetzt den jetzigen Startbildschirm und die Einstellungen")
+                .append(data.photo != null ? " sowie das Foto" : "")
+                .append(". Rückgängig geht hier nicht – vorher eine Sicherung zu erstellen schadet nicht.");
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Wiederherstellen?")
+                .setMessage(text.toString())
+                .setPositiveButton("Wiederherstellen", (dialog, which) -> applyRestore(data))
+                .setNegativeButton("Abbrechen", null)
+                .show();
+    }
+
+    private void applyRestore(Backup.Data data) {
+        restoring = true;
+        closeAppMenu();
+        closeResize();
+        closeFolder();
+        if (root.isDragging()) root.cancel();
+        if (undoState != null) {
+            main.removeCallbacks(undoExpired);
+            undoExpired.run();
+        }
+        // Alte Widgets freigeben (ihre Nummern gehören zum alten Stand)
+        for (HomeModel.Item item : model.items) {
+            if (item.type != HomeModel.Item.WIDGET) continue;
+            try {
+                widgetHost.deleteAppWidgetId(item.widgetId);
+            } catch (RuntimeException ignored) {}
+        }
+        restoreMissingApps.clear();
+        restoreMissingWidgets = 0;
+        dropMissingApps(data.home);
+        model.restoreFrom(data.home);
+        model.fresh = false;
+        model.save(this);
+        bindAll();
+        workspace.snapToPage(model.defaultPage, false);
+
+        // Einstellungen und Foto im Hintergrund; danach die Widgets nacheinander
+        Context context = getApplicationContext();
+        worker.execute(() -> {
+            boolean photo = data.photo != null && PhotoStore.importImageBytes(context, data.photo);
+            Backup.applyPrefs(getSharedPreferences("launcher", MODE_PRIVATE), data.launcherPrefs);
+            Backup.applyPrefs(PhotoStore.preferences(context), data.wallpaperPrefs);
+            // Neue Bild-Nummer zuletzt: erst dann lädt der Hintergrund – mit dem Ausschnitt aus der Sicherung
+            if (photo) PhotoStore.preferences(context).edit().putLong(PhotoStore.IMAGE, System.currentTimeMillis()).commit();
+            boolean photoFailed = data.photo != null && !photo;
+            main.post(() -> {
+                if (photoFailed) toast("Das Foto aus der Sicherung ließ sich nicht lesen.");
+                readSettings();
+                loadApps();
+                restoreQueue.clear();
+                restoreQueue.addAll(data.widgets);
+                restoreNext();
+            });
+        });
+    }
+
+    /** Apps, die es auf diesem Handy nicht gibt, aus der Sicherung nehmen und für die Meldung merken. */
+    private void dropMissingApps(HomeModel home) {
+        if (index.isEmpty()) return; // Apps noch nicht geladen: nichts voreilig wegwerfen
+        java.util.Iterator<HomeModel.Item> it = home.items.iterator();
+        while (it.hasNext()) {
+            HomeModel.Item item = it.next();
+            if (item.type == HomeModel.Item.APP && index.get(item.component) == null) {
+                noteMissing(item.component);
+                it.remove();
+            } else if (item.type == HomeModel.Item.FOLDER) {
+                java.util.Iterator<ComponentName> f = item.folder.iterator();
+                while (f.hasNext()) {
+                    ComponentName c = f.next();
+                    if (index.get(c) == null) {
+                        noteMissing(c);
+                        f.remove();
+                    }
+                }
+                if (item.folder.isEmpty()) it.remove();
+                else if (item.folder.size() == 1) {
+                    item.type = HomeModel.Item.APP;
+                    item.component = item.folder.get(0);
+                    item.folder.clear();
+                    item.title = "";
+                }
+            }
+        }
+        for (int i = 0; i < home.dock.length; i++) {
+            if (home.dock[i] != null && index.get(home.dock[i]) == null) {
+                noteMissing(home.dock[i]);
+                home.dock[i] = null;
+            }
+        }
+    }
+
+    private void noteMissing(ComponentName component) {
+        String name = component.getPackageName();
+        if (!restoreMissingApps.contains(name)) restoreMissingApps.add(name);
+    }
+
+    /** Nächstes Widget aus der Sicherung anlegen; fragt Android nach Erlaubnis, wenn nötig. */
+    private void restoreNext() {
+        while (!restoreQueue.isEmpty()) {
+            Backup.WidgetSpot spot = restoreQueue.poll();
+            AppWidgetProviderInfo info = providerFor(spot.provider);
+            if (info == null) {
+                restoreMissingWidgets++;
+                continue;
+            }
+            int id = widgetHost.allocateAppWidgetId();
+            boolean bound;
+            try {
+                bound = widgetManager.bindAppWidgetIdIfAllowed(id, info.getProfile(), info.provider, null);
+            } catch (RuntimeException e) {
+                bound = false;
+            }
+            if (bound) {
+                placeRestored(id, spot);
+                continue;
+            }
+            Intent bind = new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER_PROFILE, info.getProfile());
+            try {
+                restoreId = id;
+                restoreSpot = spot;
+                startActivityForResult(bind, REQUEST_RESTORE_BIND);
+                return; // weiter in onRestoreBound
+            } catch (ActivityNotFoundException e) {
+                widgetHost.deleteAppWidgetId(id);
+                restoreId = -1;
+                restoreSpot = null;
+                restoreMissingWidgets++;
+            }
+        }
+        finishRestore();
+    }
+
+    private void onRestoreBound(boolean allowed) {
+        int id = restoreId;
+        Backup.WidgetSpot spot = restoreSpot;
+        restoreId = -1;
+        restoreSpot = null;
+        if (id >= 0 && spot != null) {
+            if (allowed) placeRestored(id, spot);
+            else {
+                widgetHost.deleteAppWidgetId(id);
+                restoreMissingWidgets++;
+            }
+        }
+        restoreNext();
+    }
+
+    private AppWidgetProviderInfo providerFor(ComponentName provider) {
+        try {
+            for (AppWidgetProviderInfo info : widgetManager.getInstalledProvidersForProfile(Process.myUserHandle())) {
+                if (provider.equals(info.provider)) return info;
+            }
+        } catch (RuntimeException ignored) {}
+        return null;
+    }
+
+    private void placeRestored(int id, Backup.WidgetSpot spot) {
+        int page = Math.max(0, Math.min(HomeModel.MAX_PAGES - 1, spot.page));
+        while (model.pages <= page) model.pages++;
+        int[] cell = LauncherMath.restoreSpot(model.occupied(page, null), spot.x, spot.y, spot.w, spot.h);
+        for (int p = 0; cell == null && p < model.pages; p++) {
+            cell = LauncherMath.firstFree(model.occupied(p, null), spot.w, spot.h, 0);
+            if (cell != null) page = p;
+        }
+        if (cell == null) {
+            widgetHost.deleteAppWidgetId(id);
+            restoreMissingWidgets++;
+            return;
+        }
+        model.items.add(HomeModel.Item.widget(id, page, cell[0], cell[1], spot.w, spot.h));
+    }
+
+    private void finishRestore() {
+        restoring = false;
+        model.trimPages();
+        model.save(this);
+        bindAll();
+        if (restoreMissingApps.isEmpty() && restoreMissingWidgets == 0) {
+            toast("Wiederhergestellt.");
+            return;
+        }
+        StringBuilder text = new StringBuilder("Wiederhergestellt – bis auf:\n\n");
+        if (!restoreMissingApps.isEmpty()) {
+            text.append(restoreMissingApps.size()).append(restoreMissingApps.size() == 1 ? " App" : " Apps")
+                    .append(" gibt es auf diesem Handy nicht:\n");
+            for (int i = 0; i < restoreMissingApps.size() && i < 8; i++) text.append("• ").append(restoreMissingApps.get(i)).append('\n');
+            if (restoreMissingApps.size() > 8) text.append("• … und ").append(restoreMissingApps.size() - 8).append(" weitere\n");
+            text.append('\n');
+        }
+        if (restoreMissingWidgets > 0) {
+            text.append(restoreMissingWidgets).append(restoreMissingWidgets == 1 ? " Widget konnte" : " Widgets konnten")
+                    .append(" nicht angelegt werden (App fehlt, kein Platz oder nicht erlaubt).");
+        }
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Wiederherstellen")
+                .setMessage(text.toString().trim())
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
     // ---------- Gesten und Einstellungen ----------
 
     @Override public void onOpenDrawer() {
@@ -1606,6 +1914,17 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == REQUEST_EXPORT || request == REQUEST_IMPORT) {
+            Uri uri = result == RESULT_OK && data != null ? data.getData() : null;
+            if (uri == null) return;
+            if (request == REQUEST_EXPORT) exportTo(uri);
+            else importFrom(uri);
+            return;
+        }
+        if (request == REQUEST_RESTORE_BIND) {
+            onRestoreBound(result == RESULT_OK);
+            return;
+        }
         if (request != REQUEST_BIND && request != REQUEST_CONFIGURE) return;
         int id = data != null ? data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId) : pendingWidgetId;
         if (id < 0) return;

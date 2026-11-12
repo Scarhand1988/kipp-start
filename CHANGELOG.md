@@ -1,5 +1,14 @@
 # Änderungsverlauf
 
+## 0.28 – Sichern und Wiederherstellen
+
+- Neuer Punkt im Startbildschirm-Blatt: **Sichern und Wiederherstellen**.
+- **Sicherung erstellen** (mit oder ohne Foto) speichert eine JSON-Datei an einem Ort deiner Wahl (z. B. Downloads oder Google Drive): Seiten, Dock, Ordner mit Namen, Widgets (welches Widget, wo und wie groß), Startseite sowie alle Einstellungen von Startbildschirm und Hintergrund. Mit Foto ist die Datei einige MB groß.
+- **Aus Sicherung wiederherstellen** zeigt erst, was in der Datei steckt, und fragt nach. Dann ersetzt sie Startbildschirm und Einstellungen (und das Foto, falls enthalten). Rückgängig gibt es hier nicht.
+- Apps, die es auf dem Handy nicht gibt, werden weggelassen und am Ende mit Paketnamen gemeldet. Widgets werden neu angelegt – fragt Android nach Erlaubnis, erscheint die Abfrage für jedes Widget einzeln. Belegte oder fehlende Plätze weichen auf den nächsten freien Platz aus.
+- Grenze: Widgets mit eigenem Einrichtungs-Schritt (z. B. Foto- oder Kontakt-Widgets) müssen danach eventuell neu eingerichtet werden; deren Inhalt steckt nicht in der Sicherung.
+- 8 neue automatische Prüfungen (Format-Erkennung, Widget-Platz beim Wiederherstellen).
+
 ## 0.27 – Ordner und Widget-Größe
 
 - **Ordner:** Eine App auf eine andere ziehen legt einen Ordner an; weitere Apps lassen sich hineinziehen (vom Startbildschirm, aus dem Dock oder aus der App-Übersicht). Das Ordner-Symbol zeigt bis zu 4 Mini-Symbole auf einer Grafit-Kachel mit Kupferrand.
