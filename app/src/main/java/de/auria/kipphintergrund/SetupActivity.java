@@ -65,80 +65,203 @@ public final class SetupActivity extends Activity {
     private float y;
     private float zoom = 1;
 
+    // ---------- Gestaltung „Live-Vorschau“ (Layout C, neu in 0.18) ----------
+    private static final int BG = 0xFF1E2023;
+    private static final int SHEET_TOP = 0xFF2C2F33;
+    private static final int SHEET_BOTTOM = 0xFF24272A;
+    private static final int INSET = 0xFF15171A;
+    private static final int LINE = 0xFF34373B;
+    private static final int TEXT = 0xFFEDE6DC;
+    private static final int SUB = 0xFF9A948B;
+    private static final int COPPER = 0xFFD9A066;
+    private static final int COPPER_LIGHT = 0xFFE7B37C;
+    private static final int COPPER_DARK = 0xFFB97E43;
+    private static final int ON_COPPER = 0xFF2B1B08;
+    static final String EXTRA_TAB = "tab";
+    static final int TAB_TILT = 0;
+    static final int TAB_PAGES = 1;
+    static final int TAB_PHOTO = 2;
+
+    private SharedPreferences launcherPrefs;
+    private android.widget.FrameLayout previewFrame;
+    private final LinearLayout[] panels = new LinearLayout[3];
+    private final TextView[] tabs = new TextView[3];
+    private TextView primary;
+    private int tab = TAB_TILT;
+
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         preferences = PhotoStore.preferences(this);
+        launcherPrefs = getSharedPreferences("launcher", MODE_PRIVATE);
+        getWindow().setStatusBarColor(0);
+        getWindow().setNavigationBarColor(SHEET_BOTTOM);
+
+        android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable backdrop = new android.graphics.drawable.GradientDrawable();
+        backdrop.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        backdrop.setColors(new int[] {0xFF3A3D42, BG});
+        backdrop.setGradientCenter(.5f, .22f);
+        backdrop.setGradientRadius(getResources().getDisplayMetrics().widthPixels * .9f);
+        root.setBackground(backdrop);
+
+        // Oben: Live-Vorschau – das echte Foto mit Ausschnitt und Kipp-Unschärfe, leicht schräg wie ein gekipptes Handy
+        Rect display = getWindowManager().getMaximumWindowMetrics().getBounds();
+        float aspect = (float) Math.max(display.height(), display.width()) / Math.min(display.height(), display.width());
+        int previewHeight = Math.round(display.height() * .40f);
+        int frameHeight = previewHeight - dp(96);
+        int frameWidth = Math.round(frameHeight / aspect);
+        image = new CropView();
+        previewFrame = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable rim = new android.graphics.drawable.GradientDrawable();
+        rim.setColor(0xFF2A2D31);
+        rim.setCornerRadius(dp(30));
+        previewFrame.setBackground(rim);
+        previewFrame.setPadding(dp(5), dp(5), dp(5), dp(5));
+        previewFrame.setElevation(dp(18));
+        previewFrame.setClipToOutline(true);
+        previewFrame.setCameraDistance(8000 * getResources().getDisplayMetrics().density);
+        image.setClipToOutline(true);
+        image.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(25));
+            }
+        });
+        previewFrame.addView(image, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        android.widget.FrameLayout.LayoutParams frameParams =
+                new android.widget.FrameLayout.LayoutParams(frameWidth + dp(10), frameHeight + dp(10), Gravity.CENTER_HORIZONTAL);
+        frameParams.topMargin = dp(64);
+        root.addView(previewFrame, frameParams);
+
+        TextView back = new TextView(this);
+        back.setText("‹");
+        back.setTextSize(28);
+        back.setTextColor(0xFFE8E0D4);
+        back.setGravity(Gravity.CENTER);
+        back.setContentDescription("Zurück");
+        back.setBackground(raised(dp(14)));
+        back.setElevation(dp(6));
+        back.setOnClickListener(v -> finish());
+        android.widget.FrameLayout.LayoutParams backParams = new android.widget.FrameLayout.LayoutParams(dp(46), dp(46));
+        backParams.leftMargin = dp(18);
+        backParams.topMargin = dp(14);
+        root.addView(back, backParams);
+
+        TextView live = new TextView(this);
+        live.setText("LIVE-VORSCHAU");
+        live.setTextSize(12);
+        live.setLetterSpacing(.12f);
+        live.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        live.setTextColor(COPPER);
+        android.widget.FrameLayout.LayoutParams liveParams =
+                new android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.END | Gravity.TOP);
+        liveParams.rightMargin = dp(20);
+        liveParams.topMargin = dp(28);
+        root.addView(live, liveParams);
+
+        // Unten: Blatt mit Reitern Kippen / Blättern / Foto
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable sheetShape = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[] {SHEET_TOP, SHEET_BOTTOM});
+        float r = dp(32);
+        sheetShape.setCornerRadii(new float[] {r, r, r, r, 0, 0, 0, 0});
+        sheet.setBackground(sheetShape);
+        sheet.setElevation(dp(24));
+        sheet.setPadding(dp(20), dp(10), dp(20), dp(16));
+        android.widget.FrameLayout.LayoutParams sheetParams = new android.widget.FrameLayout.LayoutParams(-1, -1);
+        sheetParams.topMargin = previewHeight - dp(20);
+        root.addView(sheet, sheetParams);
+
+        View handle = new View(this);
+        android.graphics.drawable.GradientDrawable handleShape = new android.graphics.drawable.GradientDrawable();
+        handleShape.setColor(0xFF4A4D52);
+        handleShape.setCornerRadius(dp(3));
+        handle.setBackground(handleShape);
+        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(40), dp(5));
+        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        handleParams.bottomMargin = dp(12);
+        sheet.addView(handle, handleParams);
+
+        LinearLayout tabBar = new LinearLayout(this);
+        tabBar.setPadding(dp(5), dp(5), dp(5), dp(5));
+        android.graphics.drawable.GradientDrawable tabShape = new android.graphics.drawable.GradientDrawable();
+        tabShape.setColor(INSET);
+        tabShape.setCornerRadius(dp(24));
+        tabBar.setBackground(tabShape);
+        String[] names = {"Kippen", "Blättern", "Foto"};
+        for (int i = 0; i < 3; i++) {
+            TextView t = new TextView(this);
+            t.setText(names[i]);
+            t.setTextSize(15);
+            t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            t.setGravity(Gravity.CENTER);
+            final int index = i;
+            t.setOnClickListener(v -> selectTab(index));
+            tabs[i] = t;
+            tabBar.addView(t, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        }
+        sheet.addView(tabBar, new LinearLayout.LayoutParams(-1, -2));
+
         ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout stack = new LinearLayout(this);
+        stack.setOrientation(LinearLayout.VERTICAL);
+        stack.setPadding(0, dp(8), 0, dp(8));
+        scroll.addView(stack);
+        sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        for (int i = 0; i < 3; i++) {
+            panels[i] = new LinearLayout(this);
+            panels[i].setOrientation(LinearLayout.VERTICAL);
+            stack.addView(panels[i], new LinearLayout.LayoutParams(-1, -2));
+        }
+
+        primary = new TextView(this);
+        primary.setTextSize(16);
+        primary.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        primary.setTextColor(ON_COPPER);
+        primary.setGravity(Gravity.CENTER);
+        primary.setBackground(copper(dp(25)));
+        primary.setElevation(dp(4));
+        LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(-1, dp(52));
+        primaryParams.topMargin = dp(10);
+        sheet.addView(primary, primaryParams);
+
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
             var safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            backParams.topMargin = safe.top + dp(14);
+            liveParams.topMargin = safe.top + dp(28);
+            frameParams.topMargin = safe.top + dp(64);
+            sheet.setPadding(dp(20), dp(10), dp(20), dp(16) + safe.bottom);
+            view.requestLayout();
             return insets;
         });
 
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(24), dp(22), dp(24), dp(22));
-        scroll.addView(content);
+        buildTiltPanel(panels[TAB_TILT]);
+        buildPagesPanel(panels[TAB_PAGES]);
+        buildPhotoPanel(panels[TAB_PHOTO]);
 
-        TextView title = text("Kipp-Hintergrund", 30);
-        title.setGravity(Gravity.START);
-        content.addView(title);
-        content.addView(text("Wähle das Foto, das du schon als Hintergrund nutzt. Beim Kippen bewegt sich nur das Bild hinter deinen Apps.", 16));
-        Rect display = getWindowManager().getMaximumWindowMetrics().getBounds();
-        float aspect = (float) Math.max(display.height(), display.width()) / Math.min(display.height(), display.width());
-        image = new CropView();
-        // Größer als bis 0.10, damit sich der Ausschnitt direkt mit dem Finger einstellen lässt
-        LinearLayout.LayoutParams picture = new LinearLayout.LayoutParams(dp(180), dp(Math.min(400, Math.round(180 * aspect))));
-        picture.gravity = Gravity.CENTER_HORIZONTAL;
-        picture.setMargins(0, dp(14), 0, dp(10));
-        content.addView(image, picture);
+        setContentView(root);
+        selectTab(getIntent().getIntExtra(EXTRA_TAB, TAB_TILT));
+        readThumbnail();
+    }
 
-        status = text("Wähle dein bisheriges Hintergrundbild.", 14);
-        content.addView(status);
-        choose = button("Bild auswählen", this::chooseImage);
-        content.addView(choose);
-        preview = button("Android-Vorschau öffnen", this::openPreview);
-        preview.setEnabled(false);
-        content.addView(preview);
-        adjust = button("Bildausschnitt anpassen", () -> {
-            boolean open = cropOptions.getVisibility() != View.VISIBLE;
-            cropOptions.setVisibility(open ? View.VISIBLE : View.GONE);
-            adjust.setText(open ? "Bildausschnitt schließen" : "Bildausschnitt anpassen");
-        });
-        adjust.setEnabled(false);
-        content.addView(adjust);
+    private void buildTiltPanel(LinearLayout p) {
+        effect = copperSwitch();
+        effect.setChecked(preferences.getBoolean(PhotoStore.ENABLED, true));
+        effect.setOnCheckedChangeListener((view, checked) -> preferences.edit().putBoolean(PhotoStore.ENABLED, checked).apply());
+        p.addView(row("Kipp-Effekt an", "Aus = das Bild steht still und scharf wie ein normaler Hintergrund.", effect));
 
-        cropOptions = new LinearLayout(this);
-        cropOptions.setOrientation(LinearLayout.VERTICAL);
-        cropOptions.setVisibility(View.GONE);
-        horizontal = slider("Horizontal verschieben", 200, 100, value -> x = (value - 100) / 100f);
-        vertical = slider("Vertikal verschieben", 200, 100, value -> y = (value - 100) / 100f);
-        magnification = slider("Zoom", 70, 0, value -> zoom = 1f + value / 100f);
-        cropOptions.addView(button("Ausschnitt zurücksetzen", () -> {
-            horizontal.setProgress(100);
-            vertical.setProgress(100);
-            magnification.setProgress(0);
-            x = y = 0;
-            zoom = 1;
-            image.invalidate();
-            saveCrop();
-        }));
-        content.addView(cropOptions);
-
-        // Unschärfe beim Kippen: Regler von „aus“ bis „stark“, mit Live-Vorschau bei voller Neigung
+        // Unschärfe beim Kippen: Regler von „aus“ bis „stark“, Live-Vorschau oben zeigt volle Neigung
         blurStrength = PhotoStore.blurStrength(preferences);
-        blurLabel = text(blurText(blurStrength), 16);
-        content.addView(blurLabel);
-        blur = new SeekBar(this);
+        blurLabel = badge(percent(blurStrength));
+        blur = copperSlider(100, Math.round(blurStrength * 100f));
         blur.setContentDescription("Unschärfe beim Kippen");
-        blur.setMax(100);
-        blur.setProgress(Math.round(blurStrength * 100f));
         blur.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar view, int value, boolean fromUser) {
                 if (!fromUser) return;
                 blurStrength = value / 100f;
-                blurLabel.setText(blurText(blurStrength));
+                blurLabel.setText(percent(blurStrength));
                 showBlurPreview();
                 main.removeCallbacks(saveBlur);
                 main.postDelayed(saveBlur, 180);
@@ -153,107 +276,257 @@ public final class SetupActivity extends Activity {
                 main.postDelayed(hidePreview, 1500);
             }
         });
-        content.addView(blur);
-        content.addView(text("Ganz links = aus. Beim Verschieben zeigt die Vorschau oben, wie verschwommen das Bild bei voller Neigung wird.", 14));
-        content.addView(toggle("Unschärfe bleibt, solange geneigt",
-                "Aus: Das Bild wird nach etwa einer Sekunde wieder scharf, auch wenn du geneigt bleibst. "
-                        + "An: Es bleibt unscharf, bis du in die Haltung vom Entsperren zurückkippst.",
-                PhotoStore.HOLD_BLUR, false));
+        p.addView(sliderRow("Unschärfe beim Kippen", blurLabel, blur, "Ganz links = aus. Die Vorschau oben zeigt die volle Neigung."));
 
-        // Effekte nach dem Referenzvideo (je einzeln an/aus)
-        content.addView(toggle("Farben verblassen beim Kippen",
-                "Beim Neigen tritt das Bild dunkel und farblos zurück, so heben sich die Symbole ab wie im Video.",
-                PhotoStore.FROST));
-        content.addView(toggle("Entsperr-Animation",
-                "Nach dem Entsperren hebt sich das Bild in seine Ruhelage und wird dabei scharf.", PhotoStore.UNLOCK));
-        content.addView(toggle("Unschärfe bei Kontrollzentrum und Apps",
-                "Beim Runterziehen und beim Öffnen von Apps verschwimmt das Bild stufenlos mit.", PhotoStore.ZOOM_BLUR));
-        content.addView(toggle("Hintergrund beim Seitenwechsel unscharf",
-                "Im Video bleibt der Hintergrund beim Blättern scharf (deshalb aus). An: Das Bild verschwimmt beim Wischen "
-                        + "zwischen den Seiten kurz. Braucht mindestens zwei Seiten.", PhotoStore.PAGE_BLUR, false));
-        content.addView(toggle("Messanzeige",
-                "Zeigt oben auf dem Startbildschirm, wie viele Bilder pro Sekunde beim Kippen gezeichnet werden "
-                        + "und wie alt der Sensorwert beim Zeichnen ist. Zum Testen – danach wieder ausschalten.",
-                PhotoStore.MEASURE, false));
-
-        // Eigener Startbildschirm (neu in 0.12)
-        content.addView(text("Eigener Startbildschirm „Kipp-Start“", 18));
-        content.addView(text("Damit verschwimmen beim Kippen – wie im Video – auch Symbole, Widgets und Dock, die Seiten "
-                + "blenden beim Blättern unscharf ein und die Symbole fliegen nach dem Entsperren herein. Der Pixel-"
-                + "Startbildschirm bleibt installiert und lässt sich jederzeit wieder wählen.", 14));
-        content.addView(button("Kipp-Start als Startbildschirm wählen", () -> {
-            try {
-                startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
-            } catch (ActivityNotFoundException e) {
-                status.setText("Android konnte die Auswahl nicht öffnen.");
-            }
-        }));
-
-        // Kipp-Effekt an/aus – dasselbe wie der Schalter in den Schnelleinstellungen
-        effect = new Switch(this);
-        effect.setText("Kipp-Effekt an");
-        effect.setTextSize(16);
-        effect.setMinHeight(dp(48));
-        effect.setChecked(preferences.getBoolean(PhotoStore.ENABLED, true));
-        effect.setOnCheckedChangeListener((view, checked) ->
-                preferences.edit().putBoolean(PhotoStore.ENABLED, checked).apply());
-        content.addView(effect);
-        content.addView(text("Schnell an- und ausschalten: Von oben zweimal runterwischen, Stift antippen und „Kipp-Effekt“ zu den aktiven Schaltern ziehen. Aus = das Bild steht still und scharf wie ein normaler Hintergrund.", 14));
+        p.addView(row("Unschärfe bleibt", "bis du in die Haltung vom Entsperren zurückkippst",
+                prefSwitch(preferences, PhotoStore.HOLD_BLUR, false)));
+        p.addView(row("Farben verblassen", "Das Bild tritt beim Neigen dunkel und farblos zurück.",
+                prefSwitch(preferences, PhotoStore.FROST, true)));
+        p.addView(row("Symbole kippen mit", "Symbole, Widgets und Dock verschwimmen mit (nur Kipp-Start).",
+                prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
+        p.addView(row("Entsperr-Animation", "Das Bild hebt sich nach dem Entsperren in seine Ruhelage.",
+                prefSwitch(preferences, PhotoStore.UNLOCK, true)));
+        p.addView(row("Symbole fliegen herein", "Nach dem Entsperren kommen die Symbole groß und unscharf herein.",
+                prefSwitch(launcherPrefs, SettingsSheet.UNLOCK, true)));
+        p.addView(row("Unschärfe bei Kontrollzentrum und Apps", "Beim Runterziehen und App-Öffnen verschwimmt das Bild mit.",
+                prefSwitch(preferences, PhotoStore.ZOOM_BLUR, true)));
         if (Build.VERSION.SDK_INT >= 33) {
-            content.addView(button("Schalter zu den Schnelleinstellungen hinzufügen", this::requestTile));
+            p.addView(link("Schalter „Kipp-Effekt“ zu den Schnelleinstellungen", this::requestTile));
         }
-        content.addView(text("Kippe in der Android-Vorschau leicht nach links und rechts. Wähle beim Anwenden „Startbildschirm“.", 14));
-        setContentView(scroll);
-        readThumbnail();
+    }
+
+    private void buildPagesPanel(LinearLayout p) {
+        p.addView(row("Blättern mit Absatz", "Die Seite bleibt erst stehen und blättert dann weich weiter. Aus: folgt dem Finger.",
+                prefSwitch(launcherPrefs, SettingsSheet.DETENT, true)));
+        p.addView(row("Übergangseffekte", "Die neue Seite blendet unscharf ein und wird in der Mitte klar.",
+                prefSwitch(launcherPrefs, SettingsSheet.TRANSITIONS, true)));
+        p.addView(row("Hintergrund beim Blättern unscharf", "Braucht mindestens zwei Seiten.",
+                prefSwitch(preferences, PhotoStore.PAGE_BLUR, false)));
+        p.addView(row("Beschriftungen anzeigen", null, prefSwitch(launcherPrefs, SettingsSheet.LABELS, true)));
+        p.addView(row("Glanzrand", "Heller Rand oben an den Symbolen.", prefSwitch(launcherPrefs, SettingsSheet.GLOW, true)));
+        p.addView(row("Messanzeige", "Bilder pro Sekunde beim Kippen, zum Testen.", prefSwitch(preferences, PhotoStore.MEASURE, false)));
+    }
+
+    private void buildPhotoPanel(LinearLayout p) {
+        status = note("Wähle dein bisheriges Hintergrundbild.");
+        status.setPadding(0, dp(10), 0, dp(4));
+        p.addView(status);
+        choose = new Button(this); // unsichtbarer Halter für den alten Ablauf; bedient wird über den großen Knopf unten
+        preview = new Button(this);
+        adjust = new Button(this);
+        p.addView(link("Android-Vorschau öffnen und anwenden", this::openPreview));
+        cropOptions = new LinearLayout(this);
+        cropOptions.setOrientation(LinearLayout.VERTICAL);
+        horizontal = slider("Horizontal verschieben", 200, 100, value -> x = (value - 100) / 100f);
+        vertical = slider("Vertikal verschieben", 200, 100, value -> y = (value - 100) / 100f);
+        magnification = slider("Zoom", 70, 0, value -> zoom = 1f + value / 100f);
+        cropOptions.addView(link("Ausschnitt zurücksetzen", () -> {
+            horizontal.setProgress(100);
+            vertical.setProgress(100);
+            magnification.setProgress(0);
+            x = y = 0;
+            zoom = 1;
+            image.invalidate();
+            saveCrop();
+        }));
+        p.addView(cropOptions);
+        p.addView(note("Tipp: Den Ausschnitt kannst du auch direkt im Bild oben verschieben (ein Finger) und zoomen (zwei Finger)."));
+    }
+
+    private void selectTab(int index) {
+        tab = Math.max(0, Math.min(2, index));
+        for (int i = 0; i < 3; i++) {
+            boolean on = i == tab;
+            panels[i].setVisibility(on ? View.VISIBLE : View.GONE);
+            tabs[i].setBackground(on ? copper(dp(21)) : null);
+            tabs[i].setTextColor(on ? ON_COPPER : 0xFFB9B3AA);
+            tabs[i].setSelected(on);
+        }
+        // Zum Einstellen des Ausschnitts steht das Bild gerade, sonst leicht gekippt
+        float tilt = tab == TAB_PHOTO ? 0f : 1f;
+        previewFrame.animate().rotationY(-14f * tilt).rotationX(6f * tilt).setDuration(320).start();
+        if (tab == TAB_TILT) {
+            primary.setText("Jetzige Haltung als gerade");
+            primary.setOnClickListener(v -> android.widget.Toast.makeText(this, TiltBus.requestNeutral()
+                    ? "Diese Haltung gilt ab jetzt als gerade" : "Geht nur, wenn Kipp-Hintergrund als Hintergrund eingestellt ist",
+                    android.widget.Toast.LENGTH_SHORT).show());
+        } else if (tab == TAB_PAGES) {
+            primary.setText("Kipp-Start als Startbildschirm wählen");
+            primary.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
+                } catch (ActivityNotFoundException e) {
+                    android.widget.Toast.makeText(this, "Android konnte die Auswahl nicht öffnen.", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            primary.setText("Foto wählen");
+            primary.setOnClickListener(v -> { if (!reading) chooseImage(); });
+        }
     }
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+    private android.graphics.drawable.GradientDrawable copper(int radius) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[] {COPPER_LIGHT, COPPER_DARK});
+        d.setCornerRadius(radius);
+        return d;
+    }
+
+    private android.graphics.drawable.GradientDrawable raised(int radius) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR, new int[] {0xFF4A4D52, 0xFF34373B});
+        d.setCornerRadius(radius);
+        return d;
+    }
+
     private TextView text(String value, int size) {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
-        view.setPadding(0, dp(3), 0, dp(7));
+        view.setTextColor(TEXT);
         return view;
     }
 
-    /** Schalter mit kurzer Erklärung darunter, gespeichert unter dem angegebenen Schlüssel (Standard: an). */
-    private LinearLayout toggle(String label, String hint, String key) {
-        return toggle(label, hint, key, true);
+    private TextView note(String value) {
+        TextView view = text(value, 13);
+        view.setTextColor(SUB);
+        view.setPadding(0, dp(2), 0, dp(8));
+        return view;
     }
 
-    private LinearLayout toggle(String label, String hint, String key, boolean standard) {
+    private TextView badge(String value) {
+        TextView view = text(value, 14);
+        view.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        view.setTextColor(COPPER);
+        return view;
+    }
+
+    private static String percent(float strength) {
+        int p = Math.round(strength * 100f);
+        return p == 0 ? "aus" : p + " %";
+    }
+
+    /** Zeile: Titel (+ kleine Erklärung) links, Schalter rechts, Trennlinie unten. */
+    private LinearLayout row(String label, String hint, View control) {
         LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        Switch toggle = new Switch(this);
-        toggle.setText(label);
-        toggle.setTextSize(16);
-        toggle.setMinHeight(dp(48));
-        toggle.setChecked(preferences.getBoolean(key, standard));
-        toggle.setOnCheckedChangeListener((view, checked) -> preferences.edit().putBoolean(key, checked).apply());
-        box.addView(toggle);
-        box.addView(text(hint, 13));
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setMinimumHeight(dp(58));
+        box.setPadding(0, dp(8), 0, dp(8));
+        box.setBackground(divider());
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        TextView title = text(label, 15);
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        texts.addView(title);
+        if (hint != null) {
+            TextView sub = text(hint, 12);
+            sub.setTextColor(SUB);
+            texts.addView(sub);
+        }
+        box.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, -2);
+        cp.leftMargin = dp(12);
+        box.addView(control, cp);
+        box.setOnClickListener(v -> { if (control instanceof Switch) ((Switch) control).toggle(); });
         return box;
     }
 
-    private Button button(String label, Runnable action) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setMinHeight(dp(48));
-        button.setOnClickListener(view -> action.run());
-        return button;
+    private LinearLayout sliderRow(String label, TextView value, SeekBar bar, String hint) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(0, dp(12), 0, dp(10));
+        box.setBackground(divider());
+        LinearLayout head = new LinearLayout(this);
+        TextView title = text(label, 15);
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        head.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        head.addView(value);
+        box.addView(head);
+        box.addView(bar, new LinearLayout.LayoutParams(-1, dp(40)));
+        if (hint != null) {
+            TextView sub = text(hint, 12);
+            sub.setTextColor(SUB);
+            box.addView(sub);
+        }
+        return box;
+    }
+
+    private android.graphics.drawable.Drawable divider() {
+        android.graphics.drawable.GradientDrawable line = new android.graphics.drawable.GradientDrawable();
+        line.setColor(LINE);
+        android.graphics.drawable.LayerDrawable layer = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[] {line});
+        layer.setLayerGravity(0, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
+        layer.setLayerHeight(0, Math.max(1, dp(1)));
+        return layer;
+    }
+
+    private TextView link(String label, Runnable action) {
+        TextView view = text(label, 15);
+        view.setTextColor(COPPER);
+        view.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        view.setMinHeight(dp(52));
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setBackground(divider());
+        view.setOnClickListener(v -> action.run());
+        return view;
+    }
+
+    private Switch copperSwitch() {
+        Switch s = new Switch(this);
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        android.graphics.drawable.StateListDrawable track = new android.graphics.drawable.StateListDrawable();
+        android.graphics.drawable.GradientDrawable on = copper(dp(15));
+        on.setSize(dp(52), dp(30));
+        android.graphics.drawable.GradientDrawable off = new android.graphics.drawable.GradientDrawable();
+        off.setColor(INSET);
+        off.setCornerRadius(dp(15));
+        off.setSize(dp(52), dp(30));
+        track.addState(states[0], on);
+        track.addState(states[1], off);
+        android.graphics.drawable.StateListDrawable thumb = new android.graphics.drawable.StateListDrawable();
+        thumb.addState(states[0], knob(ON_COPPER));
+        thumb.addState(states[1], knob(0xFF6A6D72));
+        s.setTrackDrawable(track);
+        s.setThumbDrawable(thumb);
+        s.setShowText(false);
+        s.setText("");
+        return s;
+    }
+
+    private android.graphics.drawable.Drawable knob(int color) {
+        android.graphics.drawable.GradientDrawable dot = new android.graphics.drawable.GradientDrawable();
+        dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        dot.setColor(color);
+        dot.setSize(dp(24), dp(24));
+        android.graphics.drawable.InsetDrawable inset = new android.graphics.drawable.InsetDrawable(dot, dp(3));
+        return inset;
+    }
+
+    private Switch prefSwitch(SharedPreferences prefs, String key, boolean standard) {
+        Switch s = copperSwitch();
+        s.setChecked(prefs.getBoolean(key, standard));
+        s.setOnCheckedChangeListener((view, checked) -> prefs.edit().putBoolean(key, checked).apply());
+        return s;
+    }
+
+    private SeekBar copperSlider(int max, int value) {
+        SeekBar bar = new SeekBar(this);
+        bar.setMax(max);
+        bar.setProgress(value);
+        bar.setProgressTintList(android.content.res.ColorStateList.valueOf(COPPER));
+        bar.setThumbTintList(android.content.res.ColorStateList.valueOf(COPPER_LIGHT));
+        bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF4A4D52));
+        return bar;
     }
 
     private SeekBar slider(String label, int max, int initial, IntConsumer update) {
-        TextView name = text(label, 14);
-        cropOptions.addView(name);
-        SeekBar bar = new SeekBar(this);
+        SeekBar bar = copperSlider(max, initial);
         bar.setContentDescription(label);
-        bar.setMax(max);
-        bar.setProgress(initial);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar view, int value, boolean fromUser) {
                 if (!fromUser) return;
@@ -268,7 +541,7 @@ public final class SetupActivity extends Activity {
                 saveCrop();
             }
         });
-        cropOptions.addView(bar);
+        cropOptions.addView(sliderRow(label, new TextView(this), bar, null));
         return bar;
     }
 
@@ -367,11 +640,6 @@ public final class SetupActivity extends Activity {
         } catch (ActivityNotFoundException e) {
             status.setText("Android konnte die Live-Hintergrund-Vorschau nicht öffnen.");
         }
-    }
-
-    private static String blurText(float strength) {
-        int percent = Math.round(strength * 100f);
-        return percent == 0 ? "Unschärfe beim Kippen: aus" : "Unschärfe beim Kippen: " + percent + " %";
     }
 
     private void saveBlur() {

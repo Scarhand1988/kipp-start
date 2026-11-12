@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 0.18 – neuer Einstellungs-Bildschirm „Live-Vorschau“
+
+- **Ein gemeinsamer Bildschirm** für Hintergrund und Startbildschirm (Layout C): oben eine Live-Vorschau mit deinem Foto, Ausschnitt und Kipp-Unschärfe, leicht schräg wie ein gekipptes Handy; darunter ein Blatt mit den Reitern **Kippen**, **Blättern** und **Foto**.
+- Dunkles Grafit mit Kupfer-Akzenten, eigene Schalter und Regler in Kupfer; der große Knopf unten wechselt je Reiter: „Jetzige Haltung als gerade“, „Kipp-Start als Startbildschirm wählen“, „Foto wählen“.
+- Im Reiter Foto steht die Vorschau gerade, damit sich der Ausschnitt mit dem Finger einstellen lässt.
+- Die Schalter aus dem Startbildschirm-Blatt (Kippen der Symbole, Übergänge, Blättern mit Absatz, Symbole fliegen herein, Beschriftungen, Glanzrand) sind in den gemeinsamen Bildschirm umgezogen und wirken sofort. Das Blatt im Startbildschirm hat nur noch „Alle Einstellungen“ und die Aktionen für diesen Startbildschirm.
+
 ## 0.17 – Kippen & Stabilität
 
 - **Dock:** Ziehst du eine App aus der Übersicht auf einen belegten Dock-Platz, bekommt die bisherige App zuerst einen freien Platz (aktuelle Seite, dann die anderen). Gibt es keinen, bleibt das Dock unverändert und ein Hinweis erscheint. Vorher ging sie bei voller Seite verloren.

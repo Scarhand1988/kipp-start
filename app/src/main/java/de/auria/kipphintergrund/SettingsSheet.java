@@ -10,7 +10,6 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 
 /**
@@ -81,28 +80,18 @@ final class SettingsSheet extends FrameLayout {
         handleParams.bottomMargin = Math.round(14 * density);
         card.addView(handle, handleParams);
 
-        TextView title = text("Startbildschirm-Einstellungen", 20, Color.WHITE);
+        TextView title = text("Startbildschirm", 20, Color.WHITE);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, 0, 0, Math.round(10 * density));
         card.addView(title);
 
-        toggle(prefs, callbacks, TILT, "Kippen (Tilt)",
-                "Symbole, Widgets und Dock verschwimmen beim Kippen mit dem Hintergrund und werden dunkler.");
-        toggle(prefs, callbacks, TRANSITIONS, "Übergangseffekte",
-                "Beim Blättern blendet die neue Seite unscharf ein und wird in der Mitte klar. Der Hintergrund bleibt scharf.");
-        toggle(prefs, callbacks, DETENT, "Blättern mit Absatz",
-                "Wie im Video: Die Seite bleibt erst stehen und blättert nach einem kurzen Stück Fingerweg von selbst "
-                        + "weich weiter. Aus: Die Seite folgt dem Finger.");
-        toggle(prefs, callbacks, UNLOCK, "Entsperr-Animation",
-                "Nach dem Entsperren kommen die Symbole groß und unscharf herein und setzen sich an ihren Platz.");
-        toggle(prefs, callbacks, LABELS, "Beschriftungen anzeigen", null);
-        toggle(prefs, callbacks, GLOW, "Glanzrand", "Heller Rand oben an den Symbolen.");
-
+        // 0.18: Alle Schalter liegen jetzt im gemeinsamen Einstellungs-Bildschirm (Kippen / Blättern / Foto);
+        // hier bleiben nur Dinge, die diesen Startbildschirm direkt betreffen.
+        action("Alle Einstellungen", callbacks::onOpenWallpaperSettings);
         action("Jetzige Haltung als gerade", callbacks::onSetNeutral);
         action("Diese Seite als Startseite", callbacks::onSetDefaultPage);
         action("Widget hinzufügen", callbacks::onAddWidget);
         action("Symbole neu laden", callbacks::onReloadIcons);
-        action("Hintergrund und Kipp-Stärke", callbacks::onOpenWallpaperSettings);
         action("Anderen Startbildschirm wählen", callbacks::onChooseHomeApp);
     }
 
@@ -112,25 +101,6 @@ final class SettingsSheet extends FrameLayout {
         view.setTextSize(size);
         view.setTextColor(color);
         return view;
-    }
-
-    private void toggle(SharedPreferences prefs, Callbacks callbacks, String key, String label, String hint) {
-        Switch view = new Switch(getContext());
-        view.setText(label);
-        view.setTextSize(16);
-        view.setTextColor(Color.WHITE);
-        view.setMinHeight(Math.round(48 * density));
-        view.setChecked(prefs.getBoolean(key, true));
-        view.setOnCheckedChangeListener((v, checked) -> {
-            prefs.edit().putBoolean(key, checked).apply();
-            callbacks.onLauncherSetting(key, checked);
-        });
-        card.addView(view);
-        if (hint != null) {
-            TextView note = text(hint, 13, 0x99FFFFFF);
-            note.setPadding(0, 0, Math.round(56 * density), Math.round(8 * density));
-            card.addView(note);
-        }
     }
 
     private void action(String label, Runnable run) {

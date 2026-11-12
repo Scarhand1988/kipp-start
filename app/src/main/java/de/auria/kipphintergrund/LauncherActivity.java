@@ -144,6 +144,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         density = getResources().getDisplayMetrics().density;
         iconSize = dp(58);
         prefs = getSharedPreferences("launcher", MODE_PRIVATE);
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener);
         readSettings();
         launcherApps = getSystemService(LauncherApps.class);
         widgetManager = AppWidgetManager.getInstance(this);
@@ -167,6 +168,23 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private void toast(String text) {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
+
+    // 0.18: Schalter werden im gemeinsamen Einstellungs-Bildschirm umgelegt – hier sofort übernehmen
+    private final SharedPreferences.OnSharedPreferenceChangeListener prefsListener = (shared, key) -> {
+        if (key == null || content == null) return;
+        switch (key) {
+            case SettingsSheet.TILT:
+            case SettingsSheet.TRANSITIONS:
+            case SettingsSheet.LABELS:
+            case SettingsSheet.GLOW:
+            case SettingsSheet.UNLOCK:
+            case SettingsSheet.DETENT:
+                onLauncherSetting(key, shared.getBoolean(key, true));
+                break;
+            default:
+                break; // Startbildschirm-Belegung u. a. – nicht hier
+        }
+    };
 
     private void readSettings() {
         tiltOn = prefs.getBoolean(SettingsSheet.TILT, true);
@@ -1027,6 +1045,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     }
 
     @Override protected void onDestroy() {
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
         TiltBus.clearListener(this);
         try {
             launcherApps.unregisterCallback(appsCallback);
