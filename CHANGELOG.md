@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.29 – Knopf „Speichern“
+
+- Im Einstellungs-Bildschirm (Reiter Kippen) heißt der große Kupfer-Knopf unten jetzt **Speichern**: Er sichert alle Einstellungen, meldet „Gespeichert“ und schließt den Bildschirm.
+- „Jetzige Haltung als gerade“ ist nicht weg, sondern steht jetzt als Zeile unten in der Kippen-Liste.
+- Die Reiter Blättern und Foto behalten ihre Knöpfe („Kipp-Start als Startbildschirm wählen“, „Foto wählen“).
+
 ## 0.28 – Sichern und Wiederherstellen
 
 - Neuer Punkt im Startbildschirm-Blatt: **Sichern und Wiederherstellen**.

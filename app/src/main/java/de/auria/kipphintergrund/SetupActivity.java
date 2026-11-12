@@ -331,6 +331,10 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(launcherPrefs, SettingsSheet.UNLOCK, true)));
         p.addView(row("Unschärfe bei Kontrollzentrum und Apps", "Beim Runterziehen und App-Öffnen verschwimmt das Bild mit.",
                 prefSwitch(preferences, PhotoStore.ZOOM_BLUR, true)));
+        // 0.29: früher der große Knopf unten – jetzt eine Zeile in der Liste, der Knopf heißt „Speichern“
+        p.addView(link("Jetzige Haltung als gerade", () -> android.widget.Toast.makeText(this, TiltBus.requestNeutral()
+                ? "Diese Haltung gilt ab jetzt als gerade" : "Geht nur, wenn Kipp-Hintergrund als Hintergrund eingestellt ist",
+                android.widget.Toast.LENGTH_SHORT).show()));
         if (Build.VERSION.SDK_INT >= 33) {
             p.addView(link("Schalter „Kipp-Effekt“ zu den Schnelleinstellungen", this::requestTile));
         }
@@ -387,10 +391,9 @@ public final class SetupActivity extends Activity implements android.hardware.Se
         float tilt = tab == TAB_PHOTO ? 0f : 1f;
         previewFrame.animate().rotationY(-14f * tilt).rotationX(6f * tilt).setDuration(320).start();
         if (tab == TAB_TILT) {
-            primary.setText("Jetzige Haltung als gerade");
-            primary.setOnClickListener(v -> android.widget.Toast.makeText(this, TiltBus.requestNeutral()
-                    ? "Diese Haltung gilt ab jetzt als gerade" : "Geht nur, wenn Kipp-Hintergrund als Hintergrund eingestellt ist",
-                    android.widget.Toast.LENGTH_SHORT).show());
+            // 0.29: Speichern – schreibt alles sofort fest und schließt den Bildschirm
+            primary.setText("Speichern");
+            primary.setOnClickListener(v -> save());
         } else if (tab == TAB_PAGES) {
             primary.setText("Kipp-Start als Startbildschirm wählen");
             primary.setOnClickListener(v -> {
@@ -404,6 +407,14 @@ public final class SetupActivity extends Activity implements android.hardware.Se
             primary.setText("Foto wählen");
             primary.setOnClickListener(v -> { if (!reading) chooseImage(); });
         }
+    }
+
+    /** Einstellungen sind schon beim Ändern gespeichert; hier zusätzlich sofort auf die Platte und zurück. */
+    private void save() {
+        preferences.edit().commit();
+        launcherPrefs.edit().commit();
+        android.widget.Toast.makeText(this, "Gespeichert", android.widget.Toast.LENGTH_SHORT).show();
+        finish();
     }
 
     private int dp(int value) {
