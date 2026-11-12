@@ -18,7 +18,11 @@ final class HomeModel {
     static final class Item {
         static final int APP = 0;
         static final int WIDGET = 1;
+        /** 0.27: Ordner mit mehreren Apps. */
+        static final int FOLDER = 2;
         int type;
+        final ArrayList<ComponentName> folder = new ArrayList<>();
+        String title = "";
         ComponentName component;
         int widgetId = -1;
         int page;
@@ -59,7 +63,19 @@ final class HomeModel {
             c.y = y;
             c.w = w;
             c.h = h;
+            c.folder.addAll(folder);
+            c.title = title;
             return c;
+        }
+
+        static Item folder(String title, int page, int x, int y) {
+            Item item = new Item();
+            item.type = FOLDER;
+            item.title = title == null ? "" : title;
+            item.page = page;
+            item.x = x;
+            item.y = y;
+            return item;
         }
 
         boolean covers(int cx, int cy) {
@@ -106,6 +122,21 @@ final class HomeModel {
                     if (item.type == Item.APP) {
                         item.component = ComponentName.unflattenFromString(o.optString("component", ""));
                         if (item.component == null) continue;
+                    } else if (item.type == Item.FOLDER) {
+                        item.w = 1;
+                        item.h = 1;
+                        item.title = o.optString("title", "");
+                        JSONArray apps = o.optJSONArray("apps");
+                        for (int j = 0; apps != null && j < apps.length(); j++) {
+                            ComponentName c = ComponentName.unflattenFromString(apps.optString(j, ""));
+                            if (c != null && !item.folder.contains(c)) item.folder.add(c);
+                        }
+                        if (item.folder.isEmpty()) continue;
+                        if (item.folder.size() == 1) {
+                            item.type = Item.APP;
+                            item.component = item.folder.get(0);
+                            item.folder.clear();
+                        }
                     } else {
                         item.widgetId = o.optInt("widget", -1);
                         if (item.widgetId < 0) continue;
@@ -171,7 +202,12 @@ final class HomeModel {
             o.put("w", item.w);
             o.put("h", item.h);
             if (item.type == Item.APP) o.put("component", item.component.flattenToString());
-            else o.put("widget", item.widgetId);
+            else if (item.type == Item.FOLDER) {
+                o.put("title", item.title);
+                JSONArray apps = new JSONArray();
+                for (ComponentName c : item.folder) apps.put(c.flattenToString());
+                o.put("apps", apps);
+            } else o.put("widget", item.widgetId);
             list.put(o);
         }
         json.put("items", list);
@@ -249,6 +285,19 @@ final class HomeModel {
         while (it.hasNext()) {
             Item item = it.next();
             if (item.type == Item.APP && packageName.equals(item.component.getPackageName())) it.remove();
+            else if (item.type == Item.FOLDER) {
+                Iterator<ComponentName> f = item.folder.iterator();
+                while (f.hasNext()) {
+                    if (packageName.equals(f.next().getPackageName())) f.remove();
+                }
+                if (item.folder.isEmpty()) it.remove();
+                else if (item.folder.size() == 1) {
+                    item.type = Item.APP;
+                    item.component = item.folder.get(0);
+                    item.folder.clear();
+                    item.title = "";
+                }
+            }
         }
         for (int i = 0; i < dock.length; i++) {
             if (dock[i] != null && packageName.equals(dock[i].getPackageName())) dock[i] = null;

@@ -205,4 +205,40 @@ final class LauncherMath {
         if (pages <= 1 || width <= 0) return .5f;
         return clamp01(scrollX / (width * (pages - 1)));
     }
+
+    // ---------- 0.27: Ordner und Widget-Größe ----------
+
+    /** Spalten im geöffneten Ordner: bis 4 Apps 2, bis 9 Apps 3, sonst 4. */
+    static int folderColumns(int count) {
+        return count <= 4 ? 2 : count <= 9 ? 3 : 4;
+    }
+
+    /** Vorschau im Ordner-Symbol: höchstens 4 Mini-Symbole im 2×2-Raster. */
+    static int folderPreviewCount(int count) {
+        return Math.max(0, Math.min(4, count));
+    }
+
+    /** Größte Spanne aus einer Pixel-Obergrenze (0 = keine Grenze). */
+    static int maxSpan(float maxPixels, float cellPixels, int max) {
+        if (maxPixels <= 0) return max;
+        int s = (int) Math.floor(maxPixels / Math.max(1f, cellPixels) + .1f);
+        return Math.max(1, Math.min(max, s));
+    }
+
+    /**
+     * Widget um einen Schritt größer oder kleiner machen (dw, dh je -1, 0 oder 1). Wächst nach rechts und unten.
+     * Liefert {w, h} oder null, wenn der Schritt nicht geht (Grenze, Rand oder belegter Platz).
+     * {@code used} darf das Widget selbst nicht enthalten.
+     */
+    static int[] resize(boolean[][] used, int x, int y, int w, int h, int dw, int dh,
+            int minW, int minH, int maxW, int maxH) {
+        int nw = w + dw;
+        int nh = h + dh;
+        if (nw == w && nh == h) return null;
+        if (nw < Math.max(1, minW) || nh < Math.max(1, minH)) return null;
+        if (nw > maxW || nh > maxH) return null;
+        if (x + nw > COLUMNS || y + nh > ROWS) return null;
+        if (!fits(used, x, y, nw, nh)) return null;
+        return new int[] {nw, nh};
+    }
 }

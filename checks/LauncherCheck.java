@@ -143,6 +143,42 @@ public final class LauncherCheck {
                 "Bei 90 Hz: 8 ms flüssig, 12 ms ruckelig");
         require(!LauncherMath.janky(15_000_000L, 0) && LauncherMath.janky(20_000_000L, 0), "Ohne Termin gilt 1/60 s");
 
-        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln.");
+        // 0.27 – Ordner
+        require(LauncherMath.folderColumns(2) == 2 && LauncherMath.folderColumns(4) == 2 && LauncherMath.folderColumns(5) == 3
+                && LauncherMath.folderColumns(9) == 3 && LauncherMath.folderColumns(10) == 4 && LauncherMath.folderColumns(40) == 4,
+                "Spalten im Ordner wachsen mit der Anzahl");
+        require(LauncherMath.folderPreviewCount(1) == 1 && LauncherMath.folderPreviewCount(4) == 4
+                && LauncherMath.folderPreviewCount(12) == 4 && LauncherMath.folderPreviewCount(-3) == 0, "Höchstens 4 Mini-Symbole");
+
+        // 0.27 – Widget-Größe
+        require(LauncherMath.maxSpan(0, 100, 4) == 4 && LauncherMath.maxSpan(250, 100, 4) == 2
+                && LauncherMath.maxSpan(295, 100, 4) == 3 && LauncherMath.maxSpan(50, 100, 4) == 1
+                && LauncherMath.maxSpan(9999, 100, 4) == 4, "Obergrenze in Zellen");
+        boolean[][] grid = new boolean[LauncherMath.COLUMNS][LauncherMath.ROWS];
+        int[] r = LauncherMath.resize(grid, 0, 0, 2, 2, 1, 0, 1, 1, 4, 6);
+        require(r != null && r[0] == 3 && r[1] == 2, "Breiter auf freier Seite");
+        r = LauncherMath.resize(grid, 0, 0, 2, 2, 0, -1, 1, 1, 4, 6);
+        require(r != null && r[0] == 2 && r[1] == 1, "Niedriger");
+        require(LauncherMath.resize(grid, 0, 0, 2, 2, 0, -1, 1, 2, 4, 6) == null, "Nicht unter das Mindestmaß");
+        require(LauncherMath.resize(grid, 0, 0, 2, 2, 1, 0, 1, 1, 2, 6) == null, "Nicht über das Höchstmaß");
+        require(LauncherMath.resize(grid, 2, 0, 2, 2, 1, 0, 1, 1, 4, 6) == null, "Nicht über den rechten Rand");
+        require(LauncherMath.resize(grid, 0, 4, 2, 2, 0, 1, 1, 1, 4, 6) == null, "Nicht über den unteren Rand");
+        require(LauncherMath.resize(grid, 0, 0, 1, 1, -1, 0, 1, 1, 4, 6) == null, "Nie kleiner als 1 Zelle");
+        require(LauncherMath.resize(grid, 0, 0, 2, 2, 0, 0, 1, 1, 4, 6) == null, "Kein Schritt, keine Änderung");
+        grid[2][1] = true; // App rechts neben dem Widget
+        require(LauncherMath.resize(grid, 0, 0, 2, 2, 1, 0, 1, 1, 4, 6) == null, "Belegter Platz blockiert");
+        r = LauncherMath.resize(grid, 0, 0, 2, 2, 0, 1, 1, 1, 4, 6);
+        require(r != null && r[1] == 3, "Nach unten geht trotzdem");
+        int gw = 1, gh = 1;
+        grid = new boolean[LauncherMath.COLUMNS][LauncherMath.ROWS];
+        for (int i = 0; i < 10; i++) {
+            int[] n = LauncherMath.resize(grid, 0, 0, gw, gh, 1, 1, 1, 1, 4, 6);
+            if (n == null) break;
+            gw = n[0];
+            gh = n[1];
+        }
+        require(gw == 4 && gh == 4, "Wachsen stoppt sauber am Rand (" + gw + "×" + gh + ")");
+
+        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe.");
     }
 }

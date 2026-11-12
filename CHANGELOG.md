@@ -1,5 +1,14 @@
 # Änderungsverlauf
 
+## 0.27 – Ordner und Widget-Größe
+
+- **Ordner:** Eine App auf eine andere ziehen legt einen Ordner an; weitere Apps lassen sich hineinziehen (vom Startbildschirm, aus dem Dock oder aus der App-Übersicht). Das Ordner-Symbol zeigt bis zu 4 Mini-Symbole auf einer Grafit-Kachel mit Kupferrand.
+- Antippen öffnet den Ordner. Der Name oben lässt sich direkt ändern. Lange auf eine App im Ordner drücken nimmt sie heraus (auf den nächsten freien Platz); bleibt nur eine App übrig, wird der Ordner wieder zu dieser App.
+- Ordner lassen sich wie Apps verschieben und entfernen (mit Rückgängig); ins Dock passen sie nicht.
+- Geändert: App auf App tauscht nicht mehr die Plätze, sondern bildet einen Ordner (wie beim Pixel-Startbildschirm). Ordner auf App tauscht weiterhin.
+- **Widget-Größe:** Lange auf ein Widget drücken (ohne zu ziehen) öffnet ein Menü mit „Größe ändern“ und „Entfernen“. „Größe ändern“ zeigt eine Leiste mit Breite −/+ und Höhe −/+; das Widget ändert sich sofort. Grenzen kommen vom Widget selbst (Mindest- und Höchstgröße, nur waagrecht/senkrecht veränderbar), vom Rand und von belegten Plätzen. „Fertig“ speichert und bietet Rückgängig an.
+- 14 neue automatische Prüfungen (Ordner-Raster, Größenschritte, Grenzen, Rand, belegte Plätze).
+
 ## 0.26 – App-Menü mit Schnellaktionen
 
 - **Lange auf eine App drücken** (Startbildschirm oder Dock) öffnet ein Menü über dem Symbol: bis zu 4 Schnellaktionen der App (z. B. „Neue Nachricht“, „Selfie aufnehmen“ – je nach App), **App-Info** und **Entfernen** (mit Rückgängig).

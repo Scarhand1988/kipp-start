@@ -389,6 +389,16 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             view.setOnLongClickListener(this::onIconLongClick);
             return view;
         }
+        if (item.type == HomeModel.Item.FOLDER) {
+            AppIndex.App folder = folderApp(item);
+            if (folder == null) return null;
+            IconView view = new IconView(this, iconSize);
+            view.item = item;
+            view.bind(folder, labelsOn);
+            view.setOnClickListener(this::onIconClick);
+            view.setOnLongClickListener(this::onIconLongClick);
+            return view;
+        }
         AppWidgetProviderInfo info = widgetManager.getAppWidgetInfo(item.widgetId);
         if (info == null) return missingWidget(item);
         AppWidgetHostView host = widgetHost.createView(this, item.widgetId, info);
@@ -429,7 +439,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     private void onIconClick(View v) {
         IconView icon = (IconView) v;
-        if (icon.app != null) startApp(icon);
+        if (icon.item != null && icon.item.type == HomeModel.Item.FOLDER) openFolder(icon.item);
+        else if (icon.app != null && icon.app.component != null) startApp(icon);
     }
 
     private void startApp(IconView icon) {
@@ -471,20 +482,10 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private FrameLayout menuScrim;
 
     private void showAppMenu(IconView icon, Drag drag) {
-        closeAppMenu();
-        menuScrim = new FrameLayout(this);
-        menuScrim.setOnClickListener(v -> closeAppMenu());
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable shape = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[] {KippStyle.SHEET_TOP, KippStyle.SHEET_BOTTOM});
-        shape.setCornerRadius(dp(22));
-        shape.setStroke(Math.max(1, dp(1)), 0x33D9A066);
-        card.setBackground(shape);
-        card.setElevation(dp(12));
-        card.setPadding(dp(6), dp(6), dp(6), dp(6));
-        card.setClickable(true);
+        LinearLayout card = newMenuCard();
 
+        boolean isFolder = icon.app.component == null;
+        if (isFolder) card.addView(menuRow(null, "Ordner öffnen", KippStyle.TEXT, () -> openFolder(drag.item)));
         for (android.content.pm.ShortcutInfo shortcut : shortcutsFor(icon.app)) {
             android.graphics.drawable.Drawable image = null;
             try {
@@ -499,7 +500,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 }
             }));
         }
-        card.addView(menuRow(null, "App-Info", KippStyle.COPPER, () -> showInfo(drag)));
+        if (!isFolder) card.addView(menuRow(null, "App-Info", KippStyle.COPPER, () -> showInfo(drag)));
         card.addView(menuRow(null, "Entfernen", KippStyle.COPPER, () -> {
             HomeModel before = model.copy();
             removeDragged(drag);
@@ -514,15 +515,36 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         hint.setTextColor(KippStyle.SUB);
         hint.setPadding(dp(14), dp(4), dp(14), dp(6));
         card.addView(hint);
+        showMenuCard(card, icon);
+    }
 
+    private LinearLayout newMenuCard() {
+        closeAppMenu();
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable shape = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] {KippStyle.SHEET_TOP, KippStyle.SHEET_BOTTOM});
+        shape.setCornerRadius(dp(22));
+        shape.setStroke(Math.max(1, dp(1)), 0x33D9A066);
+        card.setBackground(shape);
+        card.setElevation(dp(12));
+        card.setPadding(dp(6), dp(6), dp(6), dp(6));
+        card.setClickable(true);
+        return card;
+    }
+
+    /** Karte über (oder unter) dem Symbol bzw. Widget anzeigen; Tippen daneben schließt sie. */
+    private void showMenuCard(LinearLayout card, View anchor) {
+        menuScrim = new FrameLayout(this);
+        menuScrim.setOnClickListener(v -> closeAppMenu());
         int width = dp(236);
         int[] at = new int[2];
-        icon.getLocationInWindow(at);
+        anchor.getLocationInWindow(at);
         card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
         int height = card.getMeasuredHeight();
-        int x = Math.max(dp(12), Math.min(root.getWidth() - width - dp(12), at[0] + icon.getWidth() / 2 - width / 2));
+        int x = Math.max(dp(12), Math.min(root.getWidth() - width - dp(12), at[0] + anchor.getWidth() / 2 - width / 2));
         int above = at[1] - height - dp(8);
-        int y = above >= insetTop + dp(8) ? above : at[1] + icon.getHeight() + dp(8);
+        int y = above >= insetTop + dp(8) ? above : at[1] + anchor.getHeight() + dp(8);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.leftMargin = x;
         params.topMargin = Math.min(y, root.getHeight() - height - dp(12));
@@ -566,7 +588,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private List<android.content.pm.ShortcutInfo> shortcutsFor(AppIndex.App app) {
         ArrayList<android.content.pm.ShortcutInfo> result = new ArrayList<>();
         try {
-            if (!launcherApps.hasShortcutHostPermission()) return result;
+            if (app == null || app.component == null || !launcherApps.hasShortcutHostPermission()) return result;
             LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery();
             query.setPackage(app.component.getPackageName());
             query.setActivity(app.component);
@@ -613,6 +635,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         drag.kind = Drag.WIDGET;
         drag.item = view.item;
         root.startDrag(drag, snapshot, view.getWidth(), view.getHeight(), view);
+        showWidgetMenu(view, drag);
     }
 
     private void dropOnPage(Drag d, float x, float y, float grabX, float grabY) {
@@ -638,7 +661,11 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                     item.page = pageIndex;
                     item.x = cell[0];
                     item.y = cell[1];
-                } else if (target != item && target.type == HomeModel.Item.APP) {
+                } else if (target != item && item.type == HomeModel.Item.APP && target.type != HomeModel.Item.WIDGET) {
+                    // 0.27: App auf App = neuer Ordner, App auf Ordner = hinzufügen
+                    model.items.remove(item);
+                    addToFolderAt(target, item.component);
+                } else if (target != item && target.type != HomeModel.Item.WIDGET) {
                     int oldPage = item.page;
                     int oldX = item.x;
                     int oldY = item.y;
@@ -657,13 +684,17 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 if (target == null) {
                     model.dock[d.dockSlot] = null;
                     model.items.add(HomeModel.Item.app(component, pageIndex, cell[0], cell[1]));
-                } else if (target.type == HomeModel.Item.APP) {
-                    model.dock[d.dockSlot] = target.component;
-                    target.component = component;
+                } else if (target.type != HomeModel.Item.WIDGET) {
+                    model.dock[d.dockSlot] = null;
+                    addToFolderAt(target, component);
                 }
                 break;
             }
             default: {
+                if (target != null && target.type != HomeModel.Item.WIDGET) {
+                    addToFolderAt(target, d.app.component);
+                    break;
+                }
                 int[] free = target == null ? cell
                         : LauncherMath.nearestFree(model.occupied(pageIndex, null), 1, 1, cell[0], cell[1]);
                 if (free == null) {
@@ -680,6 +711,10 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         ComponentName old = model.dock[slot];
         switch (d.kind) {
             case Drag.HOME:
+                if (d.item.type != HomeModel.Item.APP) {
+                    toast("Ordner passen nicht ins Dock.");
+                    break;
+                }
                 model.dock[slot] = d.item.component;
                 if (old != null) d.item.component = old;
                 else model.items.remove(d.item);
@@ -805,7 +840,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 hiddenSource = null;
             }
             dropRemove.setVisibility(d.kind == Drag.DRAWER ? View.GONE : View.VISIBLE);
-            dropInfo.setVisibility(d.kind == Drag.WIDGET ? View.GONE : View.VISIBLE);
+            boolean noInfo = d.kind == Drag.WIDGET || (d.app != null && d.app.component == null);
+            dropInfo.setVisibility(noInfo ? View.GONE : View.VISIBLE);
             dropRemove.setBackgroundColor(Color.TRANSPARENT);
             dropInfo.setBackgroundColor(Color.TRANSPARENT);
             dropBar.setVisibility(View.VISIBLE);
@@ -1006,6 +1042,370 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         bindAll();
         hideUndo();
         undoBar.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+    }
+
+    // ---------- Ordner (0.27) ----------
+
+    private FrameLayout folderScrim;
+    private HomeModel.Item openFolderItem;
+    private android.widget.EditText folderTitle;
+
+    /** Ordner als „App“ ohne Komponente: Name und zusammengesetztes Symbol. Null, wenn keine App mehr da ist. */
+    private AppIndex.App folderApp(HomeModel.Item item) {
+        ArrayList<AppIndex.App> apps = folderApps(item);
+        if (apps.isEmpty()) return null;
+        String title = item.title == null || item.title.trim().isEmpty() ? "Ordner" : item.title.trim();
+        return new AppIndex.App(null, Process.myUserHandle(), title, folderIcon(apps));
+    }
+
+    private ArrayList<AppIndex.App> folderApps(HomeModel.Item item) {
+        ArrayList<AppIndex.App> apps = new ArrayList<>();
+        for (ComponentName c : item.folder) {
+            AppIndex.App app = index.get(c);
+            if (app != null) apps.add(app);
+        }
+        return apps;
+    }
+
+    /** Grafit-Kachel mit Kupferrand und bis zu 4 Mini-Symbolen. */
+    private Bitmap folderIcon(List<AppIndex.App> apps) {
+        int size = iconSize;
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG
+                | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        float stroke = Math.max(1f, density * 1.2f);
+        android.graphics.RectF box = new android.graphics.RectF(stroke, stroke, size - stroke, size - stroke);
+        float radius = size * .28f;
+        paint.setColor(0xE62C2F33);
+        canvas.drawRoundRect(box, radius, radius, paint);
+        paint.setStyle(android.graphics.Paint.Style.STROKE);
+        paint.setStrokeWidth(stroke);
+        paint.setColor(0xB3D9A066);
+        canvas.drawRoundRect(box, radius, radius, paint);
+        paint.setStyle(android.graphics.Paint.Style.FILL);
+        int count = LauncherMath.folderPreviewCount(apps.size());
+        float pad = size * .17f;
+        float gap = size * .06f;
+        float mini = (size - 2 * pad - gap) / 2f;
+        android.graphics.RectF dst = new android.graphics.RectF();
+        for (int i = 0; i < count; i++) {
+            Bitmap icon = apps.get(i).icon;
+            if (icon == null) continue;
+            float left = pad + (i % 2) * (mini + gap);
+            float top = pad + (i / 2) * (mini + gap);
+            dst.set(left, top, left + mini, top + mini);
+            canvas.drawBitmap(icon, null, dst, paint);
+        }
+        return bitmap;
+    }
+
+    /** App auf ein Symbol gelegt: Ordner anlegen (bei einer App) oder hinzufügen (bei einem Ordner). */
+    private void addToFolderAt(HomeModel.Item target, ComponentName component) {
+        if (component == null) return;
+        if (target.type == HomeModel.Item.FOLDER) {
+            if (!target.folder.contains(component)) target.folder.add(component);
+            return;
+        }
+        if (target.type != HomeModel.Item.APP || component.equals(target.component)) return;
+        HomeModel.Item folder = HomeModel.Item.folder("Ordner", target.page, target.x, target.y);
+        folder.folder.add(target.component);
+        folder.folder.add(component);
+        int at = model.items.indexOf(target);
+        model.items.remove(target);
+        model.items.add(Math.max(0, Math.min(at, model.items.size())), folder);
+    }
+
+    private void openFolder(HomeModel.Item item) {
+        if (item == null || item.type != HomeModel.Item.FOLDER) return;
+        closeAppMenu();
+        closeFolder();
+        openFolderItem = item;
+        folderScrim = new FrameLayout(this);
+        folderScrim.setBackgroundColor(0x99000000);
+        folderScrim.setOnClickListener(v -> closeFolder());
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(KippStyle.sheet(dp(26)));
+        card.setElevation(dp(16));
+        card.setPadding(dp(16), dp(14), dp(16), dp(16));
+        card.setClickable(true);
+
+        folderTitle = new android.widget.EditText(this);
+        folderTitle.setText(item.title == null || item.title.isEmpty() ? "Ordner" : item.title);
+        folderTitle.setTextColor(KippStyle.TEXT);
+        folderTitle.setTextSize(18);
+        folderTitle.setSingleLine(true);
+        folderTitle.setGravity(Gravity.CENTER);
+        folderTitle.setBackground(null);
+        folderTitle.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        folderTitle.setContentDescription("Ordnername");
+        folderTitle.setOnEditorActionListener((v, action, event) -> {
+            folderTitle.clearFocus();
+            hideKeyboard(folderTitle);
+            return false;
+        });
+        card.addView(folderTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        View line = new View(this);
+        line.setBackgroundColor(0x55D9A066);
+        LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(dp(40), Math.max(1, dp(2)));
+        lineParams.gravity = Gravity.CENTER_HORIZONTAL;
+        lineParams.bottomMargin = dp(10);
+        card.addView(line, lineParams);
+
+        ArrayList<AppIndex.App> apps = folderApps(item);
+        int columns = LauncherMath.folderColumns(apps.size());
+        int cellWidth = dp(76);
+        int cellHeight = labelsOn ? dp(92) : dp(76);
+        LinearLayout row = null;
+        for (int i = 0; i < apps.size(); i++) {
+            if (i % columns == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                card.addView(row);
+            }
+            AppIndex.App app = apps.get(i);
+            IconView view = new IconView(this, iconSize);
+            view.bind(app, labelsOn);
+            view.setOnClickListener(v -> {
+                startApp((IconView) v);
+                main.postDelayed(this::closeFolder, 300);
+            });
+            view.setOnLongClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                takeOutOfFolder(item, app.component);
+                return true;
+            });
+            row.addView(view, new LinearLayout.LayoutParams(cellWidth, cellHeight));
+        }
+        TextView hint = new TextView(this);
+        hint.setText("Lange drücken nimmt eine App heraus");
+        hint.setTextSize(11);
+        hint.setTextColor(KippStyle.SUB);
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(0, dp(10), 0, 0);
+        card.addView(hint, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        card.setMinimumWidth(Math.min(dp(260), root.getWidth() - dp(32)));
+        folderScrim.addView(card, params);
+        root.addView(folderScrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        folderScrim.setAlpha(0f);
+        card.setScaleX(.9f);
+        card.setScaleY(.9f);
+        folderScrim.animate().alpha(1f).setDuration(160).start();
+        card.animate().scaleX(1f).scaleY(1f).setDuration(180).start();
+    }
+
+    /** Schließt den Ordner und übernimmt einen geänderten Namen. */
+    private boolean closeFolder() {
+        if (folderScrim == null) return false;
+        HomeModel.Item item = openFolderItem;
+        String title = folderTitle != null ? folderTitle.getText().toString().trim() : "";
+        if (folderTitle != null) hideKeyboard(folderTitle);
+        root.removeView(folderScrim);
+        folderScrim = null;
+        folderTitle = null;
+        openFolderItem = null;
+        if (item != null && model.items.contains(item)) {
+            String clean = title.isEmpty() ? "Ordner" : title;
+            if (!clean.equals(item.title)) {
+                HomeModel before = model.copy();
+                item.title = clean;
+                model.save(this);
+                bindAll();
+                offerUndo(before, "Umbenannt");
+            }
+        }
+        return true;
+    }
+
+    /** App aus dem Ordner auf den nächsten freien Platz legen; bleibt eine App übrig, wird der Ordner zu ihr. */
+    private void takeOutOfFolder(HomeModel.Item folder, ComponentName component) {
+        int[] spot = freeSpotFor(folder.page);
+        if (spot == null) {
+            toast("Kein freier Platz auf dem Startbildschirm.");
+            return;
+        }
+        HomeModel before = model.copy();
+        if (folderTitle != null) {
+            String title = folderTitle.getText().toString().trim();
+            folder.title = title.isEmpty() ? "Ordner" : title;
+        }
+        folder.folder.remove(component);
+        if (folder.folder.size() == 1) {
+            // Ordner löst sich auf: die letzte App nimmt seinen Platz ein
+            ComponentName last = folder.folder.get(0);
+            folder.folder.clear();
+            folder.type = HomeModel.Item.APP;
+            folder.component = last;
+            folder.title = "";
+        } else if (folder.folder.isEmpty()) {
+            model.items.remove(folder);
+        }
+        model.items.add(HomeModel.Item.app(component, spot[0], spot[1], spot[2]));
+        folderTitle = null;
+        openFolderItem = null;
+        if (folderScrim != null) {
+            root.removeView(folderScrim);
+            folderScrim = null;
+        }
+        model.save(this);
+        bindAll();
+        offerUndo(before, "Herausgenommen");
+    }
+
+    private void hideKeyboard(View view) {
+        android.view.inputmethod.InputMethodManager imm = getSystemService(android.view.inputmethod.InputMethodManager.class);
+        if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+    }
+
+    // ---------- Widget-Größe (0.27) ----------
+
+    private void showWidgetMenu(WidgetView view, Drag drag) {
+        LinearLayout card = newMenuCard();
+        card.addView(menuRow(null, "Größe ändern", KippStyle.TEXT, () -> showResize(drag.item)));
+        card.addView(menuRow(null, "Entfernen", KippStyle.COPPER, () -> {
+            HomeModel before = model.copy();
+            removeDragged(drag);
+            model.trimPages();
+            model.save(this);
+            bindAll();
+            offerUndo(before, "Entfernt");
+        }));
+        TextView hint = new TextView(this);
+        hint.setText("Zum Verschieben gedrückt halten und ziehen");
+        hint.setTextSize(11);
+        hint.setTextColor(KippStyle.SUB);
+        hint.setPadding(dp(14), dp(4), dp(14), dp(6));
+        card.addView(hint);
+        showMenuCard(card, view);
+    }
+
+    private LinearLayout resizePanel;
+    private HomeModel resizeBefore;
+    private String resizeStartPrint;
+
+    /** Grenzen {minW, minH, maxW, maxH} in Zellen aus den Angaben des Widgets. */
+    private int[] resizeLimits(HomeModel.Item item) {
+        CellLayout layout = workspace.page(item.page);
+        float cw = layout == null || layout.cellWidth() <= 1 ? dp(90) : layout.cellWidth();
+        float ch = layout == null || layout.cellHeight() <= 1 ? dp(110) : layout.cellHeight();
+        AppWidgetProviderInfo info = widgetManager.getAppWidgetInfo(item.widgetId);
+        if (info == null) return new int[] {1, 1, LauncherMath.COLUMNS, LauncherMath.ROWS};
+        boolean horizontal = (info.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0;
+        boolean vertical = (info.resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0;
+        int minW = horizontal ? LauncherMath.span(0, info.minResizeWidth > 0 ? info.minResizeWidth : info.minWidth, cw, LauncherMath.COLUMNS) : item.w;
+        int minH = vertical ? LauncherMath.span(0, info.minResizeHeight > 0 ? info.minResizeHeight : info.minHeight, ch, LauncherMath.ROWS) : item.h;
+        int maxW = item.w;
+        int maxH = item.h;
+        if (horizontal) maxW = Math.max(item.w, LauncherMath.maxSpan(info.maxResizeWidth, cw, LauncherMath.COLUMNS));
+        if (vertical) maxH = Math.max(item.h, LauncherMath.maxSpan(info.maxResizeHeight, ch, LauncherMath.ROWS));
+        return new int[] {Math.min(minW, item.w), Math.min(minH, item.h), maxW, maxH};
+    }
+
+    private void showResize(HomeModel.Item item) {
+        if (item == null || item.type != HomeModel.Item.WIDGET) return;
+        closeResize();
+        // Ein offenes „Rückgängig“ würde sonst auf einen alten Stand zurückspringen
+        if (undoState != null) {
+            main.removeCallbacks(undoExpired);
+            undoExpired.run();
+        }
+        int[] limits = resizeLimits(item);
+        if (limits[0] == limits[2] && limits[1] == limits[3]) {
+            toast("Dieses Widget hat eine feste Größe.");
+            return;
+        }
+        resizeBefore = model.copy();
+        resizeStartPrint = model.fingerprint();
+        workspace.snapToPage(item.page, true);
+        resizePanel = new LinearLayout(this);
+        resizePanel.setOrientation(LinearLayout.VERTICAL);
+        resizePanel.setBackground(KippStyle.sheet(dp(24)));
+        resizePanel.setElevation(dp(14));
+        resizePanel.setPadding(dp(14), dp(12), dp(14), dp(12));
+        resizePanel.setClickable(true);
+        TextView size = new TextView(this);
+        size.setTextColor(KippStyle.TEXT);
+        size.setTextSize(15);
+        size.setGravity(Gravity.CENTER);
+        resizePanel.addView(size, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(32)));
+        Runnable label = () -> size.setText("Größe  " + item.w + " × " + item.h);
+        label.run();
+        resizePanel.addView(resizeRow("Breite", item, limits, 1, 0, label));
+        resizePanel.addView(resizeRow("Höhe", item, limits, 0, 1, label));
+        TextView done = new TextView(this);
+        done.setText("Fertig");
+        done.setTextSize(15);
+        done.setTextColor(KippStyle.ON_COPPER);
+        done.setGravity(Gravity.CENTER);
+        done.setBackground(KippStyle.copper(dp(22)));
+        done.setOnClickListener(v -> closeResize());
+        LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        doneParams.topMargin = dp(8);
+        resizePanel.addView(done, doneParams);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(Math.min(dp(300), root.getWidth() - dp(32)),
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        params.bottomMargin = undoParams != null ? undoParams.bottomMargin : dp(150);
+        root.addView(resizePanel, params);
+    }
+
+    private View resizeRow(String name, HomeModel.Item item, int[] limits, int dw, int dh, Runnable label) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText(name);
+        title.setTextColor(KippStyle.SUB);
+        title.setTextSize(14);
+        row.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(resizeButton("−", name + " verkleinern", item, limits, -dw, -dh, label));
+        row.addView(resizeButton("+", name + " vergrößern", item, limits, dw, dh, label));
+        return row;
+    }
+
+    private View resizeButton(String symbol, String description, HomeModel.Item item, int[] limits, int dw, int dh, Runnable label) {
+        TextView button = new TextView(this);
+        button.setText(symbol);
+        button.setTextSize(22);
+        button.setTextColor(KippStyle.COPPER);
+        button.setGravity(Gravity.CENTER);
+        button.setContentDescription(description);
+        button.setBackground(KippStyle.inset(dp(20), density));
+        button.setOnClickListener(v -> {
+            int[] next = LauncherMath.resize(model.occupied(item.page, item), item.x, item.y, item.w, item.h, dw, dh,
+                    limits[0], limits[1], limits[2], limits[3]);
+            if (next == null) {
+                v.performHapticFeedback(HapticFeedbackConstants.REJECT);
+                return;
+            }
+            item.w = next[0];
+            item.h = next[1];
+            bindAll();
+            label.run();
+            v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(56), dp(44));
+        params.leftMargin = dp(8);
+        button.setLayoutParams(params);
+        return button;
+    }
+
+    private boolean closeResize() {
+        if (resizePanel == null) return false;
+        root.removeView(resizePanel);
+        resizePanel = null;
+        HomeModel before = resizeBefore;
+        resizeBefore = null;
+        if (before != null && !model.fingerprint().equals(resizeStartPrint)) {
+            model.save(this);
+            offerUndo(before, "Größe geändert");
+        }
+        return true;
     }
 
     // ---------- Gesten und Einstellungen ----------
@@ -1282,6 +1682,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         super.onNewIntent(intent);
         if (!Intent.ACTION_MAIN.equals(intent.getAction())) return;
         boolean closed = closeAppMenu();
+        closed |= closeResize();
+        closed |= closeFolder();
         if (root.isDragging()) {
             root.cancel();
             closed = true;
@@ -1299,7 +1701,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override public void onBackPressed() {
         // Der Startbildschirm schließt sich nie; Zurück schließt nur Übersicht und Einstellungen
-        if (closeAppMenu()) return;
+        if (closeAppMenu() || closeResize() || closeFolder()) return;
         if (root.isDragging()) root.cancel();
         else if (sheet.isOpen()) sheet.close();
         else if (drawer.isOpen()) drawer.close(true);
