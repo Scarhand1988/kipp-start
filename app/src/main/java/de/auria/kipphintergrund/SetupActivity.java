@@ -158,7 +158,7 @@ public final class SetupActivity extends Activity {
         content.addView(toggle("Unschärfe bleibt, solange geneigt",
                 "Aus: Das Bild wird nach etwa einer Sekunde wieder scharf, auch wenn du geneigt bleibst. "
                         + "An: Es bleibt unscharf, bis du in die Haltung vom Entsperren zurückkippst.",
-                PhotoStore.HOLD_BLUR, true));
+                PhotoStore.HOLD_BLUR, false));
 
         // Effekte nach dem Referenzvideo (je einzeln an/aus)
         content.addView(toggle("Farben verblassen beim Kippen",

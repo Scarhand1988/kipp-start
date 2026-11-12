@@ -108,6 +108,13 @@ public final class TiltWallpaperService extends WallpaperService {
         private volatile float heldDirX;
         private volatile float heldDirY;
         private boolean baseResetPending = true; // nur im Haupt-Thread
+        // 0.17: „Jetzige Haltung als gerade“ – neue Ausgangslage für die gehaltene Unschärfe, Bild wird sofort scharf
+        private final Runnable neutral = () -> {
+            heldTarget = 0;
+            if (listening) sensorHandler.post(() -> tracker.resetBase());
+            else baseResetPending = true;
+            scheduleFrame();
+        };
         // Seitenwechsel: 0 = auf einer Seite, 1 = mitten zwischen zwei Seiten
         private float pageSwipe;
         // Entsperr-Animation
@@ -169,6 +176,7 @@ public final class TiltWallpaperService extends WallpaperService {
             maxRefreshRate = readMaxRefreshRate();
             keyguard = getSystemService(KeyguardManager.class);
             if (!isPreview()) {
+                TiltBus.setNeutralHandler(neutral);
                 IntentFilter filter = new IntentFilter();
                 filter.addAction(Intent.ACTION_SCREEN_OFF);
                 filter.addAction(Intent.ACTION_USER_PRESENT);
@@ -251,6 +259,7 @@ public final class TiltWallpaperService extends WallpaperService {
             destroyed = true;
             visible = false;
             if (!isPreview()) TiltBus.publish(0f, 0f, 0f);
+            TiltBus.clearNeutralHandler(neutral);
             syncSensor();
             stopFrames();
             preferences.unregisterOnSharedPreferenceChangeListener(this);
@@ -297,7 +306,7 @@ public final class TiltWallpaperService extends WallpaperService {
             frost = preferences.getBoolean(PhotoStore.FROST, true);
             unlockAnimation = preferences.getBoolean(PhotoStore.UNLOCK, true);
             zoomBlur = preferences.getBoolean(PhotoStore.ZOOM_BLUR, true);
-            holdBlur = preferences.getBoolean(PhotoStore.HOLD_BLUR, true);
+            holdBlur = preferences.getBoolean(PhotoStore.HOLD_BLUR, false);
             pageBlur = preferences.getBoolean(PhotoStore.PAGE_BLUR, false);
             if (!pageBlur) pageSwipe = 0;
             measure = preferences.getBoolean(PhotoStore.MEASURE, false);

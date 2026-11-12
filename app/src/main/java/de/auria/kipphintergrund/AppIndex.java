@@ -39,7 +39,12 @@ final class AppIndex {
     private AppIndex(List<App> apps) {
         this.apps = Collections.unmodifiableList(apps);
         byComponent = new HashMap<>();
-        for (App app : apps) byComponent.put(app.component, app);
+        // Gleiche App in beiden Profilen: Startbildschirm und Dock meinen die aus dem eigenen Profil
+        UserHandle own = Process.myUserHandle();
+        for (App app : apps) {
+            App known = byComponent.get(app.component);
+            if (known == null || (!own.equals(known.user) && own.equals(app.user))) byComponent.put(app.component, app);
+        }
     }
 
     static AppIndex empty() {
@@ -53,10 +58,13 @@ final class AppIndex {
     /** Erste App aus einem Paket (für Standard-Apps im Dock). */
     App firstOf(String packageName) {
         if (packageName == null) return null;
+        App other = null;
         for (App app : apps) {
-            if (packageName.equals(app.component.getPackageName())) return app;
+            if (!packageName.equals(app.component.getPackageName())) continue;
+            if (Process.myUserHandle().equals(app.user)) return app;
+            if (other == null) other = app;
         }
-        return null;
+        return other;
     }
 
     boolean isEmpty() {
@@ -68,15 +76,24 @@ final class AppIndex {
         UserHandle user = Process.myUserHandle();
         int density = context.getResources().getDisplayMetrics().densityDpi;
         ArrayList<App> apps = new ArrayList<>();
-        List<LauncherActivityInfo> list;
+        // 0.17: auch Apps aus einem Arbeitsprofil (mit Profil-Abzeichen am Symbol); das eigene Profil zuerst
+        List<UserHandle> users = new ArrayList<>();
+        users.add(user);
         try {
-            list = launcherApps.getActivityList(null, user);
-        } catch (RuntimeException e) {
-            list = new ArrayList<>();
+            for (UserHandle other : launcherApps.getProfiles()) if (!other.equals(user)) users.add(other);
+        } catch (RuntimeException ignored) {}
+        List<LauncherActivityInfo> list = new ArrayList<>();
+        for (UserHandle profile : users) {
+            try {
+                list.addAll(launcherApps.getActivityList(null, profile));
+            } catch (RuntimeException ignored) {
+                // gesperrtes oder pausiertes Arbeitsprofil: einfach auslassen
+            }
         }
         for (LauncherActivityInfo info : list) {
             try {
-                Bitmap icon = IconFactory.render(info.getIcon(density), iconSize, glow);
+                boolean own = user.equals(info.getUser());
+                Bitmap icon = IconFactory.render(own ? info.getIcon(density) : info.getBadgedIcon(density), iconSize, glow);
                 apps.add(new App(info.getComponentName(), info.getUser(), String.valueOf(info.getLabel()), icon));
             } catch (RuntimeException ignored) {
                 // Einzelne kaputte Symbole dürfen den Startbildschirm nicht verhindern

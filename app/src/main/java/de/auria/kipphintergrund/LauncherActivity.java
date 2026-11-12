@@ -306,7 +306,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         int placed = 0;
         for (AppIndex.App app : index.apps) {
             if (placed >= 16) break;
-            if (used.contains(app.component)) continue;
+            if (used.contains(app.component) || !Process.myUserHandle().equals(app.user)) continue;
             model.items.add(HomeModel.Item.app(app.component, 0, placed % LauncherMath.COLUMNS, 2 + placed / LauncherMath.COLUMNS));
             placed++;
         }
@@ -352,7 +352,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             return view;
         }
         AppWidgetProviderInfo info = widgetManager.getAppWidgetInfo(item.widgetId);
-        if (info == null) return null;
+        if (info == null) return missingWidget(item);
         AppWidgetHostView host = widgetHost.createView(this, item.widgetId, info);
         if (host instanceof WidgetView) {
             WidgetView view = (WidgetView) host;
@@ -360,6 +360,31 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             view.longPress = this;
         }
         return host;
+    }
+
+    /**
+     * 0.17: Widget, dessen App Android nicht mehr meldet (deinstalliert oder gerade nicht verfügbar). Vorher blieb der
+     * Platz unsichtbar belegt. Jetzt ein Platzhalter: lange drücken und auf „Entfernen“ ziehen gibt den Platz frei.
+     */
+    private View missingWidget(HomeModel.Item item) {
+        WidgetView view = new WidgetView(this);
+        view.item = item;
+        view.longPress = this;
+        view.setClickable(true);
+        GradientDrawable box = new GradientDrawable();
+        box.setColor(0x66101418);
+        box.setStroke(Math.round(density), 0x55FFFFFF);
+        box.setCornerRadius(18 * density);
+        view.setBackground(box);
+        TextView text = new TextView(this);
+        text.setText("Widget nicht verfügbar\nLange drücken und auf Entfernen ziehen");
+        text.setTextColor(0xDDFFFFFF);
+        text.setTextSize(13);
+        text.setGravity(Gravity.CENTER);
+        int pad = Math.round(10 * density);
+        text.setPadding(pad, pad, pad, pad);
+        view.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        return view;
     }
 
     // ---------- Starten ----------
@@ -495,16 +520,36 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 model.dock[d.dockSlot] = old;
                 break;
             case Drag.DRAWER:
-                model.dock[slot] = d.app.component;
                 if (old != null) {
-                    int page = workspace.currentPage();
-                    int[] free = LauncherMath.firstFree(model.occupied(page, null), 1, 1, 0);
-                    if (free != null) model.items.add(HomeModel.Item.app(old, page, free[0], free[1]));
+                    // 0.17: Die verdrängte App braucht erst einen sicheren Platz (aktuelle Seite, dann die übrigen);
+                    // sonst bleibt das Dock unverändert – vorher ging sie bei voller Seite verloren.
+                    int[] spot = freeSpotFor(workspace.currentPage());
+                    if (spot == null) {
+                        toast("Kein freier Platz für " + label(old) + " – Dock bleibt unverändert");
+                        break;
+                    }
+                    model.items.add(HomeModel.Item.app(old, spot[0], spot[1], spot[2]));
                 }
+                model.dock[slot] = d.app.component;
                 break;
             default:
                 break;
         }
+    }
+
+    /** Freier Platz für ein Symbol: zuerst auf der Wunschseite, dann auf den anderen Seiten. {Seite, x, y} oder null. */
+    private int[] freeSpotFor(int preferred) {
+        for (int i = 0; i < model.pages; i++) {
+            int page = (preferred + i) % model.pages;
+            int[] free = LauncherMath.firstFree(model.occupied(page, null), 1, 1, 0);
+            if (free != null) return new int[] {page, free[0], free[1]};
+        }
+        return null;
+    }
+
+    private String label(ComponentName component) {
+        AppIndex.App app = index.get(component);
+        return app != null ? app.label : "die alte App";
     }
 
     private void removeDragged(Drag d) {
@@ -750,6 +795,11 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 onTilt(TiltBus.soft(), TiltBus.dark(), TiltBus.unlock());
                 break;
         }
+    }
+
+    @Override public void onSetNeutral() {
+        toast(TiltBus.requestNeutral() ? "Diese Haltung gilt jetzt als gerade"
+                : "Geht nur, wenn Kipp-Hintergrund als Hintergrund eingestellt ist");
     }
 
     @Override public void onSetDefaultPage() {

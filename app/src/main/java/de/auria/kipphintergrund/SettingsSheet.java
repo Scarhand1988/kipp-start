@@ -23,6 +23,9 @@ final class SettingsSheet extends FrameLayout {
 
         void onSetDefaultPage();
 
+        /** 0.17: jetzige Handy-Haltung als Ausgangslage für die gehaltene Kipp-Unschärfe. */
+        void onSetNeutral();
+
         void onAddWidget();
 
         void onReloadIcons();
@@ -95,6 +98,7 @@ final class SettingsSheet extends FrameLayout {
         toggle(prefs, callbacks, LABELS, "Beschriftungen anzeigen", null);
         toggle(prefs, callbacks, GLOW, "Glanzrand", "Heller Rand oben an den Symbolen.");
 
+        action("Jetzige Haltung als gerade", callbacks::onSetNeutral);
         action("Diese Seite als Startseite", callbacks::onSetDefaultPage);
         action("Widget hinzufügen", callbacks::onAddWidget);
         action("Symbole neu laden", callbacks::onReloadIcons);

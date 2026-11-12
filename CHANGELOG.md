@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 0.17 – Kippen & Stabilität
+
+- **Dock:** Ziehst du eine App aus der Übersicht auf einen belegten Dock-Platz, bekommt die bisherige App zuerst einen freien Platz (aktuelle Seite, dann die anderen). Gibt es keinen, bleibt das Dock unverändert und ein Hinweis erscheint. Vorher ging sie bei voller Seite verloren.
+- **Verschwundene Widgets:** Meldet Android ein gespeichertes Widget nicht mehr, steht dort jetzt ein Platzhalter „Widget nicht verfügbar“. Lange drücken und auf Entfernen ziehen gibt den Platz frei. Vorher war der Platz unsichtbar belegt.
+- **Unschärfe bleibt:** ab Werk aus (gilt, solange du die Option nie selbst umgestellt hast). Neu in den Startbildschirm-Einstellungen: „Jetzige Haltung als gerade“ – die Haltung in diesem Moment wird zur Ausgangslage, das Bild wird sofort scharf.
+- **Arbeitsprofil:** Apps aus einem Arbeitsprofil erscheinen in der App-Übersicht, mit dem Profil-Abzeichen am Symbol. Ist eine App in beiden Profilen, nutzen Startbildschirm und Dock die aus dem eigenen Profil.
+
 ## 0.16 – neues App-Icon
 
 - **Neues Icon „Ebenen“:** ein nach rechts gekipptes Foto (Himmel, Sonne, Berge) vor einer zweiten, nach links gekippten Ebene auf dunklem Verlauf – passend zum Kippeffekt.

@@ -34,6 +34,24 @@ final class TiltBus {
         if (listener != null) listener.onTilt(soft, dark, unlock);
     }
 
+    private static Runnable neutral;
+
+    /** 0.17: Der Hintergrund meldet hier, wie er die jetzige Haltung als „gerade“ übernimmt. */
+    static void setNeutralHandler(Runnable handler) {
+        neutral = handler;
+    }
+
+    static void clearNeutralHandler(Runnable handler) {
+        if (neutral == handler) neutral = null;
+    }
+
+    /** Jetzige Haltung als gerade setzen; false, wenn der Kipp-Hintergrund gerade nicht läuft. */
+    static boolean requestNeutral() {
+        if (neutral == null) return false;
+        neutral.run();
+        return true;
+    }
+
     static void setListener(Listener l) {
         listener = l;
         if (l != null) l.onTilt(soft, dark, unlock);
