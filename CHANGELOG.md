@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.16 – neues App-Icon
+
+- **Neues Icon „Ebenen“:** ein nach rechts gekipptes Foto (Himmel, Sonne, Berge) vor einer zweiten, nach links gekippten Ebene auf dunklem Verlauf – passend zum Kippeffekt.
+- Als **Pixel-Icon** gebaut (`mipmap-anydpi-v26/ic_launcher.xml` mit Hintergrund-, Vordergrund- und einfarbiger Ebene): das Pixel schneidet es rund zu, bewegt die Ebenen leicht und färbt es bei „Designsymbolen“ passend zu deinen Farben ein.
+- Das runde Vorschaubild in der Hintergrund-Auswahl zeigt dasselbe Motiv.
+
 ## 0.15 – weniger Ruckeln
 
 - **Kipp-Effekt auf den Symbolen:** Unschärfe und Abdunklung werden erst bei einer sichtbaren Änderung neu gesetzt (Unschärfe in 2-px-, Abdunklung in 3/255-Schritten, zurück in Ruhe immer sofort ganz). Vorher änderte schon das Zittern der Hand die Stufe in fast jedem Bild, und die Grafik musste den ganzen Startbildschirm jedes Mal neu weichzeichnen – zusätzlich zum Hintergrund, der im selben Prozess zeichnet. Bei ruhiger Hand bleibt das weichgezeichnete Bild jetzt im Zwischenspeicher der Grafik.

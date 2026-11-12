@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Rundes Vorschaubild für die Hintergrund-Auswahl (0.16): gleiches Motiv wie das App-Icon -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
-    <path android:fillColor="#17272E" android:pathData="M48,2a46,46 0,1 0,0 92a46,46 0,1 0,0 -92"/>
-    <path android:fillColor="#A5DAD2" android:pathData="M25,64L41,42L50,52L59,41L73,64Z"/>
-    <path android:fillColor="#EFD7B4" android:pathData="M55,35a5,5 0,1 0,10 0a5,5 0,1 0,-10 0"/>
-    <path android:fillColor="#00000000" android:strokeColor="#A5DAD2" android:strokeWidth="3"
-        android:pathData="M21,32Q21,27 26,27H70Q75,27 75,32V65Q75,70 70,70H26Q21,70 21,65Z"/>
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp" android:height="96dp" android:viewportWidth="72" android:viewportHeight="72">
+    <group>
+        <clip-path android:pathData="M0,36A36,36 0,1 0,72 36A36,36 0,1 0,0 36Z" />
+        <group android:translateX="-18" android:translateY="-18">
+            <path android:pathData="M0,0H108V108H0Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108">
+                        <item android:offset="0" android:color="#FF1F4049" />
+                        <item android:offset="1" android:color="#FF0D181D" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+            <group android:rotation="-14" android:pivotX="54" android:pivotY="54">
+                <path android:fillColor="#A5DAD2" android:fillAlpha="0.22"
+                    android:pathData="M39,29H65A6,6 0,0 1,71 35V73A6,6 0,0 1,65 79H39A6,6 0,0 1,33 73V35A6,6 0,0 1,39 29Z" />
+            </group>
+            <group android:rotation="9" android:pivotX="54" android:pivotY="54">
+                <clip-path android:pathData="M41,29H67A6,6 0,0 1,73 35V73A6,6 0,0 1,67 79H41A6,6 0,0 1,35 73V35A6,6 0,0 1,41 29Z" />
+                <path android:pathData="M35,29H73V79H35Z">
+                    <aapt:attr name="android:fillColor">
+                        <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78">
+                            <item android:offset="0" android:color="#FFD9F1EC" />
+                            <item android:offset="1" android:color="#FF7FC2B8" />
+                        </gradient>
+                    </aapt:attr>
+                </path>
+                <path android:fillColor="#EFD7B4" android:pathData="M57,43A5,5 0,1 0,67 43A5,5 0,1 0,57 43Z" />
+                <path android:fillColor="#2E5A62" android:pathData="M35,79L35,64L46,52L54,60L62,51L73,63L73,79Z" />
+                <path android:fillColor="#17323A" android:pathData="M35,79L35,70L44,64L53,70L63,63L73,70L73,79Z" />
+            </group>
+        </group>
+    </group>
 </vector>

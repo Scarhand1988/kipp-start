@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App-Icon (0.16), einfarbig für „Designsymbole“ auf dem Pixel: Android nutzt nur die Deckkraft -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:rotation="-14" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.45"
+            android:pathData="M39,29H65A6,6 0,0 1,71 35V73A6,6 0,0 1,65 79H39A6,6 0,0 1,33 73V35A6,6 0,0 1,39 29Z" />
+    </group>
+    <group android:rotation="9" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFF" android:fillType="evenOdd"
+            android:pathData="M41,29H67A6,6 0,0 1,73 35V73A6,6 0,0 1,67 79H41A6,6 0,0 1,35 73V35A6,6 0,0 1,41 29Z
+                M41,32.5A2.5,2.5 0,0 0,38.5 35V61.5L46,53.5L54,61.5L62,52.5L69.5,61V35A2.5,2.5 0,0 0,67 32.5Z
+                M57,43A5,5 0,1 0,67 43A5,5 0,1 0,57 43Z" />
+    </group>
+</vector>

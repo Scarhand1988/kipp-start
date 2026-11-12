@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App-Icon (0.16), Vordergrund: gekipptes Foto vor einer zweiten Ebene (Entwurf A „Ebenen“) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- hintere Ebene, nach links gekippt -->
+    <group android:rotation="-14" android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#A5DAD2" android:fillAlpha="0.22"
+            android:pathData="M39,29H65A6,6 0,0 1,71 35V73A6,6 0,0 1,65 79H39A6,6 0,0 1,33 73V35A6,6 0,0 1,39 29Z" />
+    </group>
+    <!-- vorderes Foto, nach rechts gekippt -->
+    <group android:rotation="9" android:pivotX="54" android:pivotY="54">
+        <clip-path android:pathData="M41,29H67A6,6 0,0 1,73 35V73A6,6 0,0 1,67 79H41A6,6 0,0 1,35 73V35A6,6 0,0 1,41 29Z" />
+        <path android:pathData="M35,29H73V79H35Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78">
+                    <item android:offset="0" android:color="#FFD9F1EC" />
+                    <item android:offset="1" android:color="#FF7FC2B8" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:fillColor="#EFD7B4" android:pathData="M57,43A5,5 0,1 0,67 43A5,5 0,1 0,57 43Z" />
+        <path android:fillColor="#2E5A62" android:pathData="M35,79L35,64L46,52L54,60L62,51L73,63L73,79Z" />
+        <path android:fillColor="#17323A" android:pathData="M35,79L35,70L44,64L53,70L63,63L73,70L73,79Z" />
+    </group>
+</vector>
