@@ -43,6 +43,10 @@ final class SettingsSheet extends FrameLayout {
     static final String GLOW = "glow";
     static final String UNLOCK = "unlock_icons";
     static final String DETENT = "detent";
+    /** 0.30: Tiefen-Effekt – die Seite in Kipprichtung bleibt scharf und hebt sich an. */
+    static final String DEPTH = "depth";
+    /** 0.30: Richtung des Tiefen-Effekts umkehren (falls es sich falsch herum anfühlt). */
+    static final String DEPTH_FLIP = "depth_flip";
 
     private final float density;
     private final LinearLayout card;

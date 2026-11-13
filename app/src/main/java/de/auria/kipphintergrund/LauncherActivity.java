@@ -109,6 +109,14 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private int loadGeneration;
     // Zuletzt gesetzter Kipp-Effekt (0.15): nur bei sichtbarer Änderung neu setzen
     private int appliedBlur;
+    private boolean depthOn = true;
+    private boolean depthFlip;
+    private boolean depthActive;
+    /** 0.30: je Symbol/Widget der zuletzt gesetzte Effekt {blur, dim}. */
+    private final java.util.WeakHashMap<View, int[]> depthState = new java.util.WeakHashMap<>();
+    private final ArrayList<View> depthTouched = new ArrayList<>();
+    private final int[] depthOrigin = new int[2];
+    private final int[] depthAt = new int[2];
     private int appliedDim;
 
     /** Falls der Hintergrund mitten in der Entsperr-Animation verstummt: Symbole nicht unsichtbar lassen. */
@@ -189,7 +197,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             case SettingsSheet.GLOW:
             case SettingsSheet.UNLOCK:
             case SettingsSheet.DETENT:
-                onLauncherSetting(key, shared.getBoolean(key, true));
+            case SettingsSheet.DEPTH:
+            case SettingsSheet.DEPTH_FLIP:
+                onLauncherSetting(key, shared.getBoolean(key, !SettingsSheet.DEPTH_FLIP.equals(key)));
                 break;
             default:
                 break; // Startbildschirm-Belegung u. a. – nicht hier
@@ -199,6 +209,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private void readSettings() {
         tiltOn = prefs.getBoolean(SettingsSheet.TILT, true);
         transitionsOn = prefs.getBoolean(SettingsSheet.TRANSITIONS, true);
+        depthOn = prefs.getBoolean(SettingsSheet.DEPTH, true);
+        depthFlip = prefs.getBoolean(SettingsSheet.DEPTH_FLIP, false);
         labelsOn = prefs.getBoolean(SettingsSheet.LABELS, true);
         glowOn = prefs.getBoolean(SettingsSheet.GLOW, true);
         unlockOn = prefs.getBoolean(SettingsSheet.UNLOCK, true);
@@ -1948,6 +1960,23 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             dark = 0f;
         }
         if (!unlockOn) unlock = 0f;
+        // 0.30: Tiefen-Effekt – statt einer gleichmäßigen Unschärfe bekommt jedes Symbol seine eigene:
+        // die Seite in Kipprichtung bleibt scharf und wird etwas größer, die andere verschwimmt wie bisher.
+        // Beim Entsperren und bei offener App-Übersicht gilt weiter der gleichmäßige Effekt.
+        if (depthOn && tiltOn && unlock <= 0f && (drawer == null || !drawer.isOpen())) {
+            if (!depthActive || appliedBlur != 0 || appliedDim != 0) {
+                content.setRenderEffect(null);
+                appliedBlur = 0;
+                appliedDim = 0;
+                content.setScaleX(1f);
+                content.setScaleY(1f);
+                content.setAlpha(1f);
+                depthActive = true;
+            }
+            applyDepth(LauncherMath.blurPixels(soft, 0f, density), DrawMath.dimLevel(dark), soft);
+            return;
+        }
+        if (depthActive) clearDepth();
         // Zittern der Hand nicht weitergeben: sonst zeichnet die Grafik den ganzen Bildschirm in fast jedem Bild neu weich
         int blur = LauncherMath.settle(appliedBlur, LauncherMath.blurPixels(soft, unlock, density), LauncherMath.BLUR_STEP);
         int dim = LauncherMath.settle(appliedDim, DrawMath.dimLevel(Math.max(dark, Effects.UNLOCK_DIM * unlock)), LauncherMath.DIM_STEP);
@@ -1962,6 +1991,75 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         content.setAlpha(LauncherMath.unlockAlpha(unlock));
         main.removeCallbacks(unlockWatchdog);
         if (unlock > 0) main.postDelayed(unlockWatchdog, 600);
+    }
+
+    private void applyDepth(int blurTarget, int dimTarget, float soft) {
+        float dx = TiltBus.dirX();
+        float dy = TiltBus.dirY();
+        if (depthFlip) {
+            dx = -dx;
+            dy = -dy;
+        }
+        int width = content.getWidth();
+        int height = content.getHeight();
+        if (width <= 0 || height <= 0) return;
+        content.getLocationInWindow(depthOrigin);
+        depthTouched.clear();
+        CellLayout page = workspace.currentLayout();
+        if (page != null) {
+            for (int i = 0; i < page.getChildCount(); i++) depthView(page.getChildAt(i), blurTarget, dimTarget, soft, dx, dy, width, height);
+        }
+        if (dock != null) {
+            for (int i = 0; i < dock.getChildCount(); i++) depthView(dock.getChildAt(i), blurTarget, dimTarget, soft, dx, dy, width, height);
+        }
+        // Symbole anderer Seiten (nach dem Blättern) wieder auf normal setzen
+        java.util.Iterator<java.util.Map.Entry<View, int[]>> it = depthState.entrySet().iterator();
+        while (it.hasNext()) {
+            java.util.Map.Entry<View, int[]> e = it.next();
+            if (depthTouched.contains(e.getKey())) continue;
+            resetDepth(e.getKey());
+            it.remove();
+        }
+    }
+
+    private void depthView(View view, int blurTarget, int dimTarget, float soft, float dx, float dy, int width, int height) {
+        if (view == null || view.getVisibility() != View.VISIBLE) return;
+        view.getLocationInWindow(depthAt);
+        float u = LauncherMath.depthCoord(depthAt[0] - depthOrigin[0] + view.getWidth() * view.getScaleX() / 2f, width);
+        float v = LauncherMath.depthCoord(depthAt[1] - depthOrigin[1] + view.getHeight() * view.getScaleY() / 2f, height);
+        float amount = LauncherMath.depthAmount(u, v, dx, dy);
+        int[] state = depthState.get(view);
+        boolean fresh = state == null;
+        if (fresh) {
+            state = new int[2];
+            depthState.put(view, state);
+        }
+        int blur = LauncherMath.settle(state[0], Math.round(blurTarget * amount), LauncherMath.BLUR_STEP);
+        int dim = LauncherMath.settle(state[1], Math.round(dimTarget * amount), LauncherMath.DIM_STEP);
+        if (fresh || blur != state[0] || dim != state[1]) {
+            state[0] = blur;
+            state[1] = dim;
+            view.setRenderEffect(effects.get(blur, dim));
+        }
+        float scale = LauncherMath.depthScale(LauncherMath.depthLift(amount, soft));
+        if (Math.abs(view.getScaleX() - scale) > .002f) {
+            view.setScaleX(scale);
+            view.setScaleY(scale);
+        }
+        depthTouched.add(view);
+    }
+
+    private void resetDepth(View view) {
+        if (view == null) return;
+        view.setRenderEffect(null);
+        view.setScaleX(1f);
+        view.setScaleY(1f);
+    }
+
+    private void clearDepth() {
+        for (View view : depthState.keySet()) resetDepth(view);
+        depthState.clear();
+        depthActive = false;
     }
 
     // ---------- Lebenszyklus ----------

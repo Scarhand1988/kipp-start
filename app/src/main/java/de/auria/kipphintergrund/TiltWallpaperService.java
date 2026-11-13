@@ -670,7 +670,8 @@ public final class TiltWallpaperService extends WallpaperService {
                 LightingColorFilter dimFilter = dimFilter(DrawMath.dimLevel(dark));
                 if (!isPreview()) {
                     // Eigener Startbildschirm (gleicher Prozess): Symbole und Widgets im selben Bildtakt mitnehmen
-                    TiltBus.publish(tiltSoft, enabled && frost ? Effects.frostDim(movement) : 0f, unlock);
+                    TiltBus.publish(tiltSoft, enabled && frost ? Effects.frostDim(movement) : 0f, unlock,
+                            enabled ? px : 0f, enabled ? py : 0f);
                 }
                 paint.setColorFilter(dimFilter);
                 gradientPaint.setColorFilter(dimFilter);

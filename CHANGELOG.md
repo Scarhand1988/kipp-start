@@ -1,5 +1,14 @@
 # Änderungsverlauf
 
+## 0.30 – 3D-Effekt: Symbole heben sich beim Kippen
+
+- Beim Kippen verschwimmen Symbole, Widgets und Dock nicht mehr gleichmäßig. Die Seite, zu der du das Handy kippst, bleibt scharf, wird bis zu 7 % größer und dunkelt nicht ab – sie kommt nach vorn. Die gegenüberliegende Seite verschwimmt wie bisher. Dazwischen verläuft der Übergang weich.
+- Der Fokus folgt der Neigung in jede Richtung (oben, unten, links, rechts, schräg). Kaum geneigt: nur angedeutet, damit nichts zittert.
+- Neue Schalter im Reiter Kippen: „3D-Effekt: Symbole heben sich“ (an) und „3D-Effekt umkehren“ (falls die falsche Seite scharf wird – ohne Gerät ließ sich die Richtung nicht prüfen).
+- Beim Entsperren und bei offener App-Übersicht gilt weiter der gleichmäßige Effekt. Das Hintergrundbild selbst ändert sich nicht.
+- Leistung: statt einer Unschärfe für den ganzen Bildschirm bis zu ~25 kleine. Ob es auf dem Pixel 7 flüssig bleibt, zeigt die Messanzeige.
+- 11 neue automatische Prüfungen.
+
 ## 0.29 – Knopf „Speichern“
 
 - Im Einstellungs-Bildschirm (Reiter Kippen) heißt der große Kupfer-Knopf unten jetzt **Speichern**: Er sichert alle Einstellungen, meldet „Gespeichert“ und schließt den Bildschirm.

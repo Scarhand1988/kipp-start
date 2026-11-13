@@ -196,6 +196,31 @@ public final class LauncherCheck {
         for (int x = 0; x < LauncherMath.COLUMNS; x++) for (int y = 0; y < LauncherMath.ROWS; y++) page[x][y] = true;
         require(LauncherMath.restoreSpot(page, 0, 0, 1, 1) == null, "Volle Seite: kein Platz");
 
-        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe, Sicherung.");
+        // 0.30 – Tiefen-Effekt
+        require(LauncherMath.depthAmount(.8f, 0f, 1f, 0f) == 0f, "Nach rechts gekippt: rechte Symbole ganz scharf");
+        require(LauncherMath.depthAmount(-.8f, 0f, 1f, 0f) == 1f, "Nach rechts gekippt: linke Symbole voll unscharf");
+        require(Math.abs(LauncherMath.depthAmount(0f, 0f, 1f, 0f) - .5f) < 1e-5f, "Mitte: halb");
+        require(LauncherMath.depthAmount(0f, .9f, 0f, .6f) == 0f && LauncherMath.depthAmount(0f, -.9f, 0f, .6f) == 1f,
+                "Nach unten gekippt: untere Reihe scharf, obere unscharf");
+        require(LauncherMath.depthAmount(-.9f, -.9f, -.5f, -.5f) == 0f, "Schräg nach oben links: Ecke oben links scharf");
+        require(LauncherMath.depthAmount(.5f, .5f, 0f, 0f) == 1f, "Ohne Neigung: wie bisher (gleichmäßig)");
+        float weak = LauncherMath.depthAmount(.8f, 0f, .03f, 0f);
+        require(weak > .7f && weak < 1f, "Kaum geneigt: Fokus nur angedeutet (" + weak + ")");
+        float prevA = 2f;
+        boolean mono = true;
+        for (int i = -10; i <= 10; i++) {
+            float am = LauncherMath.depthAmount(i / 10f, 0f, .5f, 0f);
+            if (am > prevA + 1e-6f || am < 0f || am > 1f) mono = false;
+            prevA = am;
+        }
+        require(mono, "Von hinten nach vorn wird es stetig schärfer");
+        require(LauncherMath.depthLift(0f, 1f) == 1f && LauncherMath.depthLift(1f, 1f) == 0f
+                && LauncherMath.depthLift(0f, 0f) == 0f, "Anheben nur scharf und nur beim Kippen");
+        require(Math.abs(LauncherMath.depthScale(1f) - 1.07f) < 1e-5f && LauncherMath.depthScale(0f) == 1f, "Höchstens 7 % größer");
+        require(LauncherMath.depthCoord(0f, 100f) == -1f && LauncherMath.depthCoord(50f, 100f) == 0f
+                && LauncherMath.depthCoord(100f, 100f) == 1f && LauncherMath.depthCoord(500f, 100f) == 1f
+                && LauncherMath.depthCoord(10f, 0f) == 0f, "Lage auf dem Bildschirm");
+
+        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe, Sicherung, 3D-Effekt.");
     }
 }

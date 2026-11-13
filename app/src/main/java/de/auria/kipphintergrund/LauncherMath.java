@@ -254,4 +254,40 @@ final class LauncherMath {
         if (fits(used, x, y, w, h)) return new int[] {x, y};
         return firstFree(used, w, h, 0);
     }
+
+    // ---------- 0.30: Tiefen-Effekt (Fokus folgt der Neigung) ----------
+
+    /** Ab dieser Neigung zeigt der Fokus die volle Richtung; darunter blendet er weich ein (kein Zittern bei Ruhe). */
+    static final float DEPTH_FULL_DIR = .15f;
+    /** Wie stark die scharfen Symbole größer werden (7 %). */
+    static final float DEPTH_SCALE = .07f;
+
+    /**
+     * Unschärfe-Anteil eines Symbols 0 (ganz scharf, „angehoben“) … 1 (volle Unschärfe wie bisher).
+     * u, v = Lage der Symbol-Mitte auf dem Bildschirm (-1 links/oben … 1 rechts/unten),
+     * dirX, dirY = Neigung (-1 … 1). Die Seite in Neigungsrichtung wird scharf, die andere bleibt unscharf.
+     */
+    static float depthAmount(float u, float v, float dirX, float dirY) {
+        float m = (float) Math.hypot(dirX, dirY);
+        if (m < 1e-4f) return 1f;
+        float p = (u * dirX + v * dirY) / m;          // -1.4 … 1.4: wie weit „vorne“ das Symbol liegt
+        float a = Math.max(0f, Math.min(1f, .5f - p * .75f));
+        float k = Math.min(1f, m / DEPTH_FULL_DIR);    // kleine Neigung: Richtung noch unsicher → wie bisher
+        return 1f + (a - 1f) * k;
+    }
+
+    /** Anheben 0 … 1: nur während gekippt wird (soft) und nur für die scharfe Seite. */
+    static float depthLift(float amount, float soft) {
+        return Math.max(0f, Math.min(1f, (1f - amount) * soft));
+    }
+
+    static float depthScale(float lift) {
+        return 1f + DEPTH_SCALE * lift;
+    }
+
+    /** Lage einer Mitte im Bereich 0 … size als -1 … 1. */
+    static float depthCoord(float center, float size) {
+        if (size <= 0) return 0f;
+        return Math.max(-1f, Math.min(1f, center / size * 2f - 1f));
+    }
 }

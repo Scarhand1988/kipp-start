@@ -21,6 +21,9 @@ final class TiltBus {
     private static volatile float soft;
     private static volatile float dark;
     private static volatile float unlock;
+    /** 0.30: Neigungsrichtung -1 … 1 (für den Tiefen-Effekt der Symbole). */
+    private static volatile float dirX;
+    private static volatile float dirY;
     private static volatile long lastPublish;
     private static final Runnable deliver = () -> {
         pending.set(false);
@@ -31,16 +34,21 @@ final class TiltBus {
     private TiltBus() {}
 
     static synchronized void publish(float newSoft, float newDark, float newUnlock) {
+        publish(newSoft, newDark, newUnlock, 0f, 0f);
+    }
+
+    static synchronized void publish(float newSoft, float newDark, float newUnlock, float newDirX, float newDirY) {
         lastPublish = SystemClock.uptimeMillis();
         if (Math.abs(newSoft - soft) < .002f && Math.abs(newDark - dark) < .002f && Math.abs(newUnlock - unlock) < .002f
+                && Math.abs(newDirX - dirX) < .004f && Math.abs(newDirY - dirY) < .004f
                 && !(newUnlock == 0 && unlock != 0) && !(newSoft == 0 && soft != 0)) {
             return;
         }
-        synchronized (TiltBus.class) {
-            soft = newSoft;
-            dark = newDark;
-            unlock = newUnlock;
-        }
+        soft = newSoft;
+        dark = newDark;
+        unlock = newUnlock;
+        dirX = newDirX;
+        dirY = newDirY;
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
             Listener l = listener;
             if (l != null) l.onTilt(soft, dark, unlock);
@@ -86,4 +94,8 @@ final class TiltBus {
     static float dark() { return dark; }
 
     static float unlock() { return unlock; }
+
+    static float dirX() { return dirX; }
+
+    static float dirY() { return dirY; }
 }

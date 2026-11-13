@@ -325,6 +325,10 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(preferences, PhotoStore.FROST, true)));
         p.addView(row("Symbole kippen mit", "Symbole, Widgets und Dock verschwimmen mit (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
+        p.addView(row("3D-Effekt: Symbole heben sich", "Die Seite, zu der du kippst, bleibt scharf und kommt nach vorn; die andere verschwimmt (nur Kipp-Start).",
+                prefSwitch(launcherPrefs, SettingsSheet.DEPTH, true)));
+        p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird.",
+                prefSwitch(launcherPrefs, SettingsSheet.DEPTH_FLIP, false)));
         p.addView(row("Entsperr-Animation", "Das Bild hebt sich nach dem Entsperren in seine Ruhelage.",
                 prefSwitch(preferences, PhotoStore.UNLOCK, true)));
         p.addView(row("Symbole fliegen herein", "Nach dem Entsperren kommen die Symbole groß und unscharf herein.",
