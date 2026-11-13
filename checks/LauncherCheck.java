@@ -216,7 +216,13 @@ public final class LauncherCheck {
         require(mono, "Von hinten nach vorn wird es stetig schärfer");
         require(LauncherMath.depthLift(0f, 1f) == 1f && LauncherMath.depthLift(1f, 1f) == 0f
                 && LauncherMath.depthLift(0f, 0f) == 0f, "Anheben nur scharf und nur beim Kippen");
-        require(Math.abs(LauncherMath.depthScale(1f) - 1.07f) < 1e-5f && LauncherMath.depthScale(0f) == 1f, "Höchstens 7 % größer");
+        require(Math.abs(LauncherMath.depthScale(1f) - 1.16f) < 1e-5f && LauncherMath.depthScale(0f) == 1f, "Höchstens 16 % größer");
+        require(Math.abs(LauncherMath.depthScale(0f, 1f) - 1.16f) < 1e-5f, "Vorn: 16 % größer");
+        require(Math.abs(LauncherMath.depthScale(1f, 1f) - .94f) < 1e-5f, "Hinten: 6 % kleiner");
+        require(LauncherMath.depthScale(0f, 0f) == 1f && LauncherMath.depthScale(1f, 0f) == 1f, "Ohne Kippen: normale Größe");
+        require(LauncherMath.depthScale(.2f, .5f) > 1f && LauncherMath.depthScale(.9f, .5f) < 1f, "Halb gekippt: vorn größer, hinten kleiner");
+        require(LauncherMath.depthShift(1f, 1f, 2f) == 14f && LauncherMath.depthShift(1f, -1f, 2f) == -14f
+                && LauncherMath.depthShift(0f, 1f, 2f) == 0f && LauncherMath.depthShift(1f, 5f, 2f) == 14f, "Mitwandern höchstens 7 dp");
         require(LauncherMath.depthCoord(0f, 100f) == -1f && LauncherMath.depthCoord(50f, 100f) == 0f
                 && LauncherMath.depthCoord(100f, 100f) == 1f && LauncherMath.depthCoord(500f, 100f) == 1f
                 && LauncherMath.depthCoord(10f, 0f) == 0f, "Lage auf dem Bildschirm");

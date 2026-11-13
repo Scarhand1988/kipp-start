@@ -259,8 +259,12 @@ final class LauncherMath {
 
     /** Ab dieser Neigung zeigt der Fokus die volle Richtung; darunter blendet er weich ein (kein Zittern bei Ruhe). */
     static final float DEPTH_FULL_DIR = .15f;
-    /** Wie stark die scharfen Symbole größer werden (7 %). */
-    static final float DEPTH_SCALE = .07f;
+    /** Wie stark die scharfen Symbole größer werden (0.31: 16 % statt 7 %). */
+    static final float DEPTH_SCALE = .16f;
+    /** 0.31: Die unscharfe Seite tritt zurück (bis 6 % kleiner). */
+    static final float DEPTH_SINK = .06f;
+    /** 0.31: Angehobene Symbole wandern in Kipprichtung mit (in dp). */
+    static final float DEPTH_SHIFT_DP = 7f;
 
     /**
      * Unschärfe-Anteil eines Symbols 0 (ganz scharf, „angehoben“) … 1 (volle Unschärfe wie bisher).
@@ -283,6 +287,18 @@ final class LauncherMath {
 
     static float depthScale(float lift) {
         return 1f + DEPTH_SCALE * lift;
+    }
+
+    /** 0.31: Größe mit Zurücktreten der unscharfen Seite: vorn größer, hinten kleiner, ohne Kippen 1. */
+    static float depthScale(float amount, float soft) {
+        float s = Math.max(0f, Math.min(1f, soft));
+        float a = Math.max(0f, Math.min(1f, amount));
+        return 1f + DEPTH_SCALE * (1f - a) * s - DEPTH_SINK * a * s;
+    }
+
+    /** 0.31: Verschiebung eines angehobenen Symbols in Kipprichtung (Pixel) – wirkt wie näher am Auge. */
+    static float depthShift(float lift, float dir, float density) {
+        return Math.max(-1f, Math.min(1f, dir)) * lift * DEPTH_SHIFT_DP * density;
     }
 
     /** Lage einer Mitte im Bereich 0 … size als -1 … 1. */

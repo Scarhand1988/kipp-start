@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 0.31 – 3D-Effekt stärker
+
+- Die scharfen Symbole kommen deutlicher nach vorn: bis 16 % größer (vorher 7 %), sie wandern bis 7 dp in Kipprichtung mit und liegen über ihren Nachbarn.
+- Die unscharfe Seite tritt zurück (bis 6 % kleiner). Dadurch wirkt der Abstand zwischen vorn und hinten größer.
+- Kein Schlagschatten: Android wirft für Symbole ohne feste Form keinen Schatten; das wäre ein eigener Schritt.
+
 ## 0.30 – 3D-Effekt: Symbole heben sich beim Kippen
 
 - Beim Kippen verschwimmen Symbole, Widgets und Dock nicht mehr gleichmäßig. Die Seite, zu der du das Handy kippst, bleibt scharf, wird bis zu 7 % größer und dunkelt nicht ab – sie kommt nach vorn. Die gegenüberliegende Seite verschwimmt wie bisher. Dazwischen verläuft der Übergang weich.

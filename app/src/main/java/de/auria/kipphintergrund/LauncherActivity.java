@@ -2025,8 +2025,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private void depthView(View view, int blurTarget, int dimTarget, float soft, float dx, float dy, int width, int height) {
         if (view == null || view.getVisibility() != View.VISIBLE) return;
         view.getLocationInWindow(depthAt);
-        float u = LauncherMath.depthCoord(depthAt[0] - depthOrigin[0] + view.getWidth() * view.getScaleX() / 2f, width);
-        float v = LauncherMath.depthCoord(depthAt[1] - depthOrigin[1] + view.getHeight() * view.getScaleY() / 2f, height);
+        // Lage ohne die eigene Verschiebung, sonst schaukelt sich der Effekt auf
+        float u = LauncherMath.depthCoord(depthAt[0] - view.getTranslationX() - depthOrigin[0] + view.getWidth() * view.getScaleX() / 2f, width);
+        float v = LauncherMath.depthCoord(depthAt[1] - view.getTranslationY() - depthOrigin[1] + view.getHeight() * view.getScaleY() / 2f, height);
         float amount = LauncherMath.depthAmount(u, v, dx, dy);
         int[] state = depthState.get(view);
         boolean fresh = state == null;
@@ -2041,11 +2042,18 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             state[1] = dim;
             view.setRenderEffect(effects.get(blur, dim));
         }
-        float scale = LauncherMath.depthScale(LauncherMath.depthLift(amount, soft));
+        float lift = LauncherMath.depthLift(amount, soft);
+        float scale = LauncherMath.depthScale(amount, soft);
         if (Math.abs(view.getScaleX() - scale) > .002f) {
             view.setScaleX(scale);
             view.setScaleY(scale);
         }
+        // 0.31: angehobene Symbole wandern ein Stück in Kipprichtung und liegen über den Nachbarn
+        float sx = LauncherMath.depthShift(lift, dx, density);
+        float sy = LauncherMath.depthShift(lift, dy, density);
+        if (Math.abs(view.getTranslationX() - sx) > .3f) view.setTranslationX(sx);
+        if (Math.abs(view.getTranslationY() - sy) > .3f) view.setTranslationY(sy);
+        view.setTranslationZ(lift * 8f * density);
         depthTouched.add(view);
     }
 
@@ -2054,6 +2062,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         view.setRenderEffect(null);
         view.setScaleX(1f);
         view.setScaleY(1f);
+        view.setTranslationX(0f);
+        view.setTranslationY(0f);
+        view.setTranslationZ(0f);
     }
 
     private void clearDepth() {
