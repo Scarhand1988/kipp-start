@@ -196,16 +196,20 @@ public final class LauncherCheck {
         for (int x = 0; x < LauncherMath.COLUMNS; x++) for (int y = 0; y < LauncherMath.ROWS; y++) page[x][y] = true;
         require(LauncherMath.restoreSpot(page, 0, 0, 1, 1) == null, "Volle Seite: kein Platz");
 
-        // 0.30 – Tiefen-Effekt
-        require(LauncherMath.depthAmount(.8f, 0f, 1f, 0f) == 0f, "Nach rechts gekippt: rechte Symbole ganz scharf");
-        require(LauncherMath.depthAmount(-.8f, 0f, 1f, 0f) == 1f, "Nach rechts gekippt: linke Symbole voll unscharf");
-        require(Math.abs(LauncherMath.depthAmount(0f, 0f, 1f, 0f) - .5f) < 1e-5f, "Mitte: halb");
-        require(LauncherMath.depthAmount(0f, .9f, 0f, .6f) == 0f && LauncherMath.depthAmount(0f, -.9f, 0f, .6f) == 1f,
-                "Nach unten gekippt: untere Reihe scharf, obere unscharf");
-        require(LauncherMath.depthAmount(-.9f, -.9f, -.5f, -.5f) == 0f, "Schräg nach oben links: Ecke oben links scharf");
-        require(LauncherMath.depthAmount(.5f, .5f, 0f, 0f) == 1f, "Ohne Neigung: wie bisher (gleichmäßig)");
+        // 0.32 – Tiefen-Effekt wie im Video
+        require(LauncherMath.depthAmount(.9f, 0f, .4f, 0f) == 0f, "Rechts weggekippt: rechte Spalte scharf");
+        require(LauncherMath.depthAmount(-.8f, 0f, .4f, 0f) == 1f, "Rechts weggekippt: linke Spalte voll unscharf");
+        require(LauncherMath.depthAmount(0f, -.9f, 0f, -.6f) < .01f && LauncherMath.depthAmount(0f, .9f, 0f, -.6f) == 1f,
+                "Oben weggekippt: obere Reihe scharf, untere unscharf");
+        require(LauncherMath.depthAmount(.5f, .5f, 0f, 0f) == 1f, "Ohne Neigung: gleichmäßig wie bisher");
         float weak = LauncherMath.depthAmount(.8f, 0f, .03f, 0f);
         require(weak > .7f && weak < 1f, "Kaum geneigt: Fokus nur angedeutet (" + weak + ")");
+        require(LauncherMath.depthAmount(.3f, 0f, .2f, 0f) < LauncherMath.depthAmount(.3f, 0f, .9f, 0f),
+                "Stärker gekippt: scharfer Streifen wird schmaler");
+        require(LauncherMath.depthAmount(0f, 0f, .2f, 0f) < .5f && LauncherMath.depthAmount(0f, 0f, 1f, 0f) > .7f,
+                "Mitte: leicht gekippt eher scharf, stark gekippt unscharf");
+        float edge = LauncherMath.depthAmount(1f, 0f, 1f, 0f);
+        require(Math.abs(edge - LauncherMath.DEPTH_FLOOR) < 1e-4f, "Voll gekippt: auch die scharfe Kante leicht weich (" + edge + ")");
         float prevA = 2f;
         boolean mono = true;
         for (int i = -10; i <= 10; i++) {
@@ -213,16 +217,10 @@ public final class LauncherCheck {
             if (am > prevA + 1e-6f || am < 0f || am > 1f) mono = false;
             prevA = am;
         }
-        require(mono, "Von hinten nach vorn wird es stetig schärfer");
-        require(LauncherMath.depthLift(0f, 1f) == 1f && LauncherMath.depthLift(1f, 1f) == 0f
-                && LauncherMath.depthLift(0f, 0f) == 0f, "Anheben nur scharf und nur beim Kippen");
-        require(Math.abs(LauncherMath.depthScale(1f) - 1.16f) < 1e-5f && LauncherMath.depthScale(0f) == 1f, "Höchstens 16 % größer");
-        require(Math.abs(LauncherMath.depthScale(0f, 1f) - 1.16f) < 1e-5f, "Vorn: 16 % größer");
-        require(Math.abs(LauncherMath.depthScale(1f, 1f) - .94f) < 1e-5f, "Hinten: 6 % kleiner");
-        require(LauncherMath.depthScale(0f, 0f) == 1f && LauncherMath.depthScale(1f, 0f) == 1f, "Ohne Kippen: normale Größe");
-        require(LauncherMath.depthScale(.2f, .5f) > 1f && LauncherMath.depthScale(.9f, .5f) < 1f, "Halb gekippt: vorn größer, hinten kleiner");
-        require(LauncherMath.depthShift(1f, 1f, 2f) == 14f && LauncherMath.depthShift(1f, -1f, 2f) == -14f
-                && LauncherMath.depthShift(0f, 1f, 2f) == 0f && LauncherMath.depthShift(1f, 5f, 2f) == 14f, "Mitwandern höchstens 7 dp");
+        require(mono, "Von der unscharfen zur scharfen Seite wird es stetig schärfer");
+        require(LauncherMath.depthAlpha(0f, 1f) == 1f && LauncherMath.depthAlpha(1f, 0f) == 1f, "Scharf oder nicht gekippt: voll sichtbar");
+        require(Math.abs(LauncherMath.depthAlpha(1f, 1f) - .18f) < 1e-5f, "Unscharfe Seite verblasst bis auf 18 %");
+        require(LauncherMath.depthAlpha(.5f, 1f) > .75f, "Übergang verblasst nur wenig");
         require(LauncherMath.depthCoord(0f, 100f) == -1f && LauncherMath.depthCoord(50f, 100f) == 0f
                 && LauncherMath.depthCoord(100f, 100f) == 1f && LauncherMath.depthCoord(500f, 100f) == 1f
                 && LauncherMath.depthCoord(10f, 0f) == 0f, "Lage auf dem Bildschirm");

@@ -274,10 +274,27 @@ final class LauncherMath {
     static float depthAmount(float u, float v, float dirX, float dirY) {
         float m = (float) Math.hypot(dirX, dirY);
         if (m < 1e-4f) return 1f;
-        float p = (u * dirX + v * dirY) / m;          // -1.4 … 1.4: wie weit „vorne“ das Symbol liegt
-        float a = Math.max(0f, Math.min(1f, .5f - p * .75f));
+        float p = (u * dirX + v * dirY) / m;          // -1.4 … 1.4: wie weit das Symbol auf der scharfen Seite liegt
+        // 0.32, im Video gemessen: je stärker gekippt, desto schmaler der scharfe Streifen
+        // (leicht gekippt: etwa die halbe Seite scharf, stark gekippt: nur noch die äußere Spalte)
+        float mm = Math.min(1f, m);
+        float a = Math.max(0f, Math.min(1f, .35f + .45f * mm - p * .8f));
+        // ganz stark gekippt: auch die scharfe Seite wird leicht weich
+        a = Math.max(a, DEPTH_FLOOR * Math.max(0f, (mm - .7f) / .3f));
         float k = Math.min(1f, m / DEPTH_FULL_DIR);    // kleine Neigung: Richtung noch unsicher → wie bisher
         return 1f + (a - 1f) * k;
+    }
+
+    /** 0.32: Rest-Unschärfe der scharfen Seite bei voller Neigung. */
+    static final float DEPTH_FLOOR = .22f;
+    /** 0.32: Unscharfe Symbole verblassen (bis 82 % durchsichtig), wie im Video. */
+    static final float DEPTH_FADE = .82f;
+
+    /** 0.32: Deckkraft eines Symbols: scharfe Seite voll, unscharfe Seite verblasst mit der Neigung. */
+    static float depthAlpha(float amount, float soft) {
+        float a = Math.max(0f, Math.min(1f, amount));
+        float s = Math.max(0f, Math.min(1f, soft));
+        return 1f - DEPTH_FADE * a * a * s;
     }
 
     /** Anheben 0 … 1: nur während gekippt wird (soft) und nur für die scharfe Seite. */

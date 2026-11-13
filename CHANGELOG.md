@@ -1,5 +1,15 @@
 # Änderungsverlauf
 
+## 0.32 – 3D-Effekt nach dem Video
+
+Das Video Bild für Bild ausgewertet (22 s, vor allem die ersten 2,5 s mit dem Kippen) und den Effekt danach umgebaut:
+
+- **Keine Größenänderung mehr.** Im Video werden die Symbole nicht größer und wandern nicht – Vergrößern, Verkleinern und Mitwandern aus 0.31 sind wieder raus.
+- **Unscharfe Seite verblasst.** Die Symbole der einen Seite verschwimmen und werden bis auf 18 % durchsichtig; die der anderen Seite bleiben scharf, hell und farbig. Vor dem abgedunkelten Bild stechen sie dadurch hervor.
+- **Scharfer Streifen wird schmaler.** Leicht gekippt ist etwa die halbe Seite scharf, stark gekippt nur noch die äußere Spalte; ganz stark gekippt wird auch sie leicht weich.
+- **Richtung wie im Video:** scharf bleibt die Kante, die von dir weg kippt – jetzt auch beim Kippen nach oben und unten (war dort vorher umgekehrt). „3D-Effekt umkehren“ gibt es weiter.
+- Nicht geändert: Hintergrundbild (Abdunklung und Unschärfe waren schon früher nach diesem Video eingestellt), Entsperren, Blättern.
+
 ## 0.31 – 3D-Effekt stärker
 
 - Die scharfen Symbole kommen deutlicher nach vorn: bis 16 % größer (vorher 7 %), sie wandern bis 7 dp in Kipprichtung mit und liegen über ihren Nachbarn.

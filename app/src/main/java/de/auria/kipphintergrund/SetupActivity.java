@@ -325,7 +325,7 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(preferences, PhotoStore.FROST, true)));
         p.addView(row("Symbole kippen mit", "Symbole, Widgets und Dock verschwimmen mit (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
-        p.addView(row("3D-Effekt: Symbole heben sich", "Die Seite, zu der du kippst, bleibt scharf und kommt nach vorn; die andere verschwimmt (nur Kipp-Start).",
+        p.addView(row("3D-Effekt: Symbole stechen hervor", "Wie im Video: Die weggekippte Seite bleibt scharf und hell, die andere verschwimmt und verblasst (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH, true)));
         p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird.",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH_FLIP, false)));
