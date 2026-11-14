@@ -104,6 +104,7 @@ public final class TiltWallpaperService extends WallpaperService {
         private int softGeneration;
         private volatile boolean enabled = true;
         private boolean frost = true;
+        private volatile boolean shift;
         private boolean unlockAnimation = true;
         private boolean zoomBlur = true;
         private volatile boolean holdBlur;
@@ -337,6 +338,7 @@ public final class TiltWallpaperService extends WallpaperService {
             blurStrength = PhotoStore.blurStrength(preferences);
             enabled = preferences.getBoolean(PhotoStore.ENABLED, true);
             frost = preferences.getBoolean(PhotoStore.FROST, true);
+            shift = preferences.getBoolean(PhotoStore.SHIFT, false);
             unlockAnimation = preferences.getBoolean(PhotoStore.UNLOCK, true);
             zoomBlur = preferences.getBoolean(PhotoStore.ZOOM_BLUR, true);
             holdBlur = preferences.getBoolean(PhotoStore.HOLD_BLUR, false);
@@ -650,7 +652,7 @@ public final class TiltWallpaperService extends WallpaperService {
                 int width = canvas.getWidth();
                 int height = canvas.getHeight();
                 MotionMath.cover(width, height, photo.getWidth(), photo.getHeight(),
-                        zoom, positionX, positionY, px, py,
+                        zoom, positionX, positionY, shift ? px : 0f, shift ? py : 0f,
                         MotionMath.systemScale(zoomOut, systemMaxScale), bounds);
                 destination.set(bounds[0], bounds[1], bounds[2], bounds[3]);
 

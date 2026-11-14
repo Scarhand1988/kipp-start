@@ -34,6 +34,8 @@ final class PhotoStore {
     static final String PAGE_BLUR = "page_blur";
     /** Neu 0.11: Messanzeige (Bilder pro Sekunde, Verzögerung) auf dem Hintergrund (Standard: aus). */
     static final String MEASURE = "measure";
+    /** 0.33: Bild verschiebt sich beim Kippen mit (aus = Bild steht still wie im Video). */
+    static final String SHIFT = "shift";
     /** Ab 0.11 wird das Foto als JPEG gespeichert: deutlich kleiner und schneller zu laden als PNG. */
     private static final String IMAGE_NAME = "photo.jpg";
     /** Bis 0.10 lag das Foto als PNG vor; wird beim ersten Laden einmalig umgewandelt. */

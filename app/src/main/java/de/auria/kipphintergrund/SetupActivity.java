@@ -323,6 +323,8 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(preferences, PhotoStore.HOLD_BLUR, false)));
         p.addView(row("Farben verblassen", "Das Bild tritt beim Neigen dunkel und farblos zurück.",
                 prefSwitch(preferences, PhotoStore.FROST, true)));
+        p.addView(row("Bild bewegt sich mit", "Aus = das Bild bleibt beim Kippen an seinem Platz, nur Schärfe und Helligkeit ändern sich.",
+                prefSwitch(preferences, PhotoStore.SHIFT, false)));
         p.addView(row("Symbole kippen mit", "Symbole, Widgets und Dock verschwimmen mit (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
         p.addView(row("3D-Effekt: Symbole stechen hervor", "Wie im Video: Die weggekippte Seite bleibt scharf und hell, die andere verschwimmt und verblasst (nur Kipp-Start).",
@@ -419,6 +421,10 @@ public final class SetupActivity extends Activity implements android.hardware.Se
         launcherPrefs.edit().commit();
         android.widget.Toast.makeText(this, "Gespeichert", android.widget.Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    private boolean shiftOn() {
+        return preferences != null && preferences.getBoolean(PhotoStore.SHIFT, false);
     }
 
     private int dp(int value) {
@@ -893,7 +899,7 @@ public final class SetupActivity extends Activity implements android.hardware.Se
             if (photo == null) return;
             // Gleiche Vergrößerung wie der Startbildschirm in Ruhe, damit die Vorschau dem Ergebnis entspricht
             MotionMath.cover(getWidth(), getHeight(), photo.getWidth(), photo.getHeight(),
-                    zoom, x, y, tiltX, tiltY, systemScale, bounds);
+                    zoom, x, y, shiftOn() ? tiltX : 0f, shiftOn() ? tiltY : 0f, systemScale, bounds);
             destination.set(bounds[0], bounds[1], bounds[2], bounds[3]);
             paint.setAlpha(255);
             canvas.drawBitmap(photo, null, destination, paint);

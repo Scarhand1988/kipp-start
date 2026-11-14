@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 0.33 – Hintergrundbild steht still
+
+- Das Hintergrundbild verschiebt sich beim Kippen nicht mehr. Es bleibt an seinem Platz; nur Schärfe und Helligkeit ändern sich mit der Neigung.
+- Wer das Mitbewegen zurückhaben will: neuer Schalter „Bild bewegt sich mit“ im Reiter Kippen (standardmäßig aus).
+
 ## 0.32 – 3D-Effekt nach dem Video
 
 Das Video Bild für Bild ausgewertet (22 s, vor allem die ersten 2,5 s mit dem Kippen) und den Effekt danach umgebaut:
