@@ -28,8 +28,11 @@ final class Effects {
     static final float UNLOCK_LIFT = .03f;
     /** Abdunklung zu Beginn der Entsperr-Animation. */
     static final float UNLOCK_DIM = .45f;
-    /** Größte Abdunklung bei voller Neigung (Farben verblassen), geeicht an den Messwerten aus dem Video. */
-    static final float FROST_DIM = .72f;
+    /**
+     * Größte Abdunklung bei voller Neigung (Farben verblassen). 0.34, an vier Standbildern nachgemessen:
+     * ganz gekippt ist das Bild fast schwarz (heller Himmel etwa 150 → 42, dunkle Stellen 16–17).
+     */
+    static final float FROST_DIM = .86f;
     /** Größte Abdunklung bei ganz geöffnetem Kontrollzentrum. */
     static final float ZOOM_DIM = .30f;
     /** Größte Deckkraft der weichen Version mitten im Seitenwechsel. */

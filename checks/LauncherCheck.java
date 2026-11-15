@@ -221,6 +221,15 @@ public final class LauncherCheck {
         require(LauncherMath.depthAlpha(0f, 1f) == 1f && LauncherMath.depthAlpha(1f, 0f) == 1f, "Scharf oder nicht gekippt: voll sichtbar");
         require(Math.abs(LauncherMath.depthAlpha(1f, 1f) - .18f) < 1e-5f, "Unscharfe Seite verblasst bis auf 18 %");
         require(LauncherMath.depthAlpha(.5f, 1f) > .75f, "Übergang verblasst nur wenig");
+        // 0.34 – nach vier Standbildern: härterer Übergang und dunklere scharfe Seite bei starker Neigung
+        require(LauncherMath.depthAmount(.25f, 0f, 1f, 0f) > .9f, "Voll gekippt: Spalte neben der scharfen fast ganz unscharf");
+        require(LauncherMath.depthAmount(.75f, 0f, 1f, 0f) < .3f, "Voll gekippt: äußere Spalte bleibt scharf");
+        require(LauncherMath.depthAmount(.25f, 0f, .3f, 0f) < .35f, "Leicht gekippt: dritte Spalte noch weitgehend scharf");
+        require(LauncherMath.depthAlpha(LauncherMath.depthAmount(.25f, 0f, 1f, 0f), 1f) < .3f, "Voll gekippt: Nachbarspalte verblasst");
+        require(LauncherMath.depthShade(0f, .5f) == 0f && LauncherMath.depthShade(0f, .6f) == 0f, "Bis mittlere Neigung bleibt die scharfe Seite hell");
+        require(Math.abs(LauncherMath.depthShade(0f, 1f) - LauncherMath.DEPTH_SHADE) < 1e-5f, "Voll gekippt: scharfe Seite deutlich dunkler");
+        require(LauncherMath.depthShade(1f, 0f) == 1f && LauncherMath.depthShade(.4f, .2f) == .4f, "Unscharfe Seite dunkelt wie bisher ab");
+        require(LauncherMath.depthShade(0f, .8f) > 0f && LauncherMath.depthShade(0f, .8f) < LauncherMath.depthShade(0f, 1f), "Abdunklung der scharfen Seite wächst stetig");
         require(LauncherMath.depthCoord(0f, 100f) == -1f && LauncherMath.depthCoord(50f, 100f) == 0f
                 && LauncherMath.depthCoord(100f, 100f) == 1f && LauncherMath.depthCoord(500f, 100f) == 1f
                 && LauncherMath.depthCoord(10f, 0f) == 0f, "Lage auf dem Bildschirm");

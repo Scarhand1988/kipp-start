@@ -265,7 +265,7 @@
     UNLOCK_SCALE: 0.08,
     UNLOCK_LIFT: 0.03,
     UNLOCK_DIM: 0.45,
-    FROST_DIM: 0.72,
+    FROST_DIM: 0.86,
     AWAY_SOFT: 0.30,
     FROST_RGB: [27, 26, 26],
     ease(progress) { const p = clamp01(progress); const q = 1 - p; return 1 - q * q * q; },

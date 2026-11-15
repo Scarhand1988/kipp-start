@@ -2036,7 +2036,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             depthState.put(view, state);
         }
         int blur = LauncherMath.settle(state[0], Math.round(blurTarget * amount), LauncherMath.BLUR_STEP);
-        int dim = LauncherMath.settle(state[1], Math.round(dimTarget * amount), LauncherMath.DIM_STEP);
+        // 0.34: stark gekippt wird auch die scharfe Seite dunkler (wie in den Standbildern)
+        float shade = LauncherMath.depthShade(amount, (float) Math.hypot(dx, dy));
+        int dim = LauncherMath.settle(state[1], Math.round(dimTarget * shade), LauncherMath.DIM_STEP);
         if (fresh || blur != state[0] || dim != state[1]) {
             state[0] = blur;
             state[1] = dim;

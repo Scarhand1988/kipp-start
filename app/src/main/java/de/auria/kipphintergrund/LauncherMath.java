@@ -278,7 +278,9 @@ final class LauncherMath {
         // 0.32, im Video gemessen: je stärker gekippt, desto schmaler der scharfe Streifen
         // (leicht gekippt: etwa die halbe Seite scharf, stark gekippt: nur noch die äußere Spalte)
         float mm = Math.min(1f, m);
-        float a = Math.max(0f, Math.min(1f, .35f + .45f * mm - p * .8f));
+        // 0.34, an vier Standbildern nachgemessen: stark gekippt ist der Übergang härter – die Spalte neben der
+        // scharfen ist dann schon fast ganz unscharf und verblasst (vorher blieb sie zu 70 % sichtbar)
+        float a = Math.max(0f, Math.min(1f, (.47f + .43f * mm - p) * (.5f + mm)));
         // ganz stark gekippt: auch die scharfe Seite wird leicht weich
         a = Math.max(a, DEPTH_FLOOR * Math.max(0f, (mm - .7f) / .3f));
         float k = Math.min(1f, m / DEPTH_FULL_DIR);    // kleine Neigung: Richtung noch unsicher → wie bisher
@@ -295,6 +297,19 @@ final class LauncherMath {
         float a = Math.max(0f, Math.min(1f, amount));
         float s = Math.max(0f, Math.min(1f, soft));
         return 1f - DEPTH_FADE * a * a * s;
+    }
+
+    /** 0.34: So viel der Abdunklung trifft bei voller Neigung auch die scharfe Seite (im Standbild 200 → 90). */
+    static final float DEPTH_SHADE = .7f;
+
+    /**
+     * 0.34: Anteil der Abdunklung für ein Symbol. Unscharfe Seite wie bisher voll; die scharfe Seite bleibt
+     * bis zu mittlerer Neigung hell und wird erst bei starker Neigung (ab 0,6) deutlich dunkler.
+     */
+    static float depthShade(float amount, float tilt) {
+        float a = Math.max(0f, Math.min(1f, amount));
+        float t = Math.max(0f, Math.min(1f, (Math.abs(tilt) - .6f) / .4f));
+        return Math.max(a, DEPTH_SHADE * t);
     }
 
     /** Anheben 0 … 1: nur während gekippt wird (soft) und nur für die scharfe Seite. */

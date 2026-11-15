@@ -1,5 +1,15 @@
 # Änderungsverlauf
 
+## 0.34 – Kipp-Effekt nach vier Standbildern nachgemessen
+
+Vier Standbilder aus dem Video (gerade, leicht, mittel und stark gekippt) ausgemessen und mit 0.33 verglichen. Das Hintergrundbild steht in allen vier Bildern still; es ändern sich nur Helligkeit, Schärfe und Deckkraft. Drei Stellen wichen ab:
+
+- **Bild wird fast schwarz.** Ganz gekippt dunkelt das Hintergrundbild jetzt um 86 % ab (vorher 72 %). Gemessen: heller Himmel etwa 150 → 42, dunkle Stellen 16–17.
+- **Härterer Übergang bei starker Neigung.** Stark gekippt ist nur noch die äußere Spalte scharf; die Spalte daneben ist fast ganz unscharf und verblasst auf rund 20 % (vorher blieb sie zu 70 % sichtbar). Leicht gekippt ist es wie bisher.
+- **Scharfe Seite wird stark gekippt dunkler.** Bis zu mittlerer Neigung bleiben die scharfen Symbole hell; darüber dunkeln sie mit ab (gemessen: etwa 200 → 90).
+- Unverändert: keine Größenänderung, kein Verschieben, Verblassen der unscharfen Seite bis 18 %.
+- 8 neue automatische Prüfungen.
+
 ## 0.33 – Hintergrundbild steht still
 
 - Das Hintergrundbild verschiebt sich beim Kippen nicht mehr. Es bleibt an seinem Platz; nur Schärfe und Helligkeit ändern sich mit der Neigung.

@@ -375,8 +375,8 @@ public final class MotionCheck {
         float full = Effects.frostDim(1);
         float bright = 145 * (1 - full) + Effects.FROST_GREEN * full;
         float darkPx = 19 * (1 - full) + Effects.FROST_GREEN * full;
-        require(bright >= 45 && bright <= 65,
-                "Helle Stellen fallen wie im Video von etwa 145 auf 50–63 (" + bright + ")");
+        require(bright >= 38 && bright <= 65,
+                "Helle Stellen fallen ganz gekippt von etwa 145 auf rund 42 (Standbild, 0.34) (" + bright + ")");
         require(darkPx <= 26, "Dunkle Stellen bleiben wie im Video dunkel (" + darkPx + ")");
         require(Effects.frostDim(.5f) > .3f, "Schon bei halber Neigung deutlich dunkler, wie im Video");
 
