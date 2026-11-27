@@ -51,6 +51,35 @@ public final class Depth3dCheck {
         require(a < .75f && a > .5f, "Gekippt scheint die Unschärfe durch, Motiv bleibt klar");
         require(near(Depth3d.subjectAlpha(.85f, 0f, false), .15f), "Nur Parallax: Motiv wird mit weich");
         require(Depth3d.subjectAlpha(0f, 1f, true) == 0f, "Entsperren: ganz weich");
+        // 0.37: Hintergrund und Symbole verschwimmen auf derselben Seite und mit demselben Verlauf
+        float[] r = new float[3];
+        float[] side = new float[2];
+        float[] tilts = {-1f, -.6f, -.3f, -.1f, .1f, .3f, .6f, 1f};
+        for (boolean flip : new boolean[] {false, true}) {
+            for (float tx : tilts) {
+                for (float ty : new float[] {0f, .4f, -.8f}) {
+                    float bx = Depth3d.blurX(tx, flip);
+                    float by = Depth3d.blurY(ty, flip);
+                    float m = (float) Math.hypot(bx, by);
+                    Effects.blurSide(bx, by, side);
+                    Depth3d.ramp(m, r);
+                    for (float u = -1f; u <= 1.001f; u += .25f) {
+                        for (float v = -1f; v <= 1.001f; v += .5f) {
+                            float icon = LauncherMath.depthAmount(u, v, -bx, -by);
+                            float wall = Depth3d.rampAmount((u * bx + v * by) / m, r);
+                            require(Math.abs(icon - wall) < 2e-3f, "Bild und Symbol gleich unscharf ("
+                                    + flip + ", " + tx + ", " + ty + ", " + u + ", " + v + ")");
+                        }
+                    }
+                    if (ty == 0f && Math.abs(tx) >= .3f) {
+                        float edge = Math.signum(side[0]);
+                        require(LauncherMath.depthAmount(edge, 0f, -bx, -by)
+                                > LauncherMath.depthAmount(-edge, 0f, -bx, -by), "Unscharfe Seite des Bildes = unscharfe Symbole");
+                    }
+                }
+            }
+        }
+        require(Depth3d.blurX(.5f, true) == -.5f && Depth3d.blurY(.5f, false) == .5f, "Umkehren dreht beides");
         System.out.println(passed + " Prüfungen (Depth3d) bestanden");
     }
 }

@@ -1,5 +1,16 @@
 # Änderungsverlauf
 
+## 0.37 – Bild und Symbole verschwimmen gemeinsam, wie im Video
+
+Neun Standbilder aus dem Video verglichen: Hintergrund, Uhr, Icons und Einstellungsblatt verschwimmen wie eine Fläche; scharf bleibt die Kante, die von dir weg kippt. Nichts verschiebt sich.
+
+- **Fehler behoben:** Beim Kippen nach links oder rechts wurde das Bild auf der einen Seite unscharf, die Symbole auf der anderen. Jetzt gilt für beide dieselbe Richtung (nach oben und unten war es schon richtig).
+- **Gleicher Verlauf:** Die scharfe Seite des Bildes ist genauso breit wie die der Symbole – leicht gekippt etwa die halbe Seite, stark gekippt nur die äußere Spalte. Die weggekippte Seite des Bildes bleibt jetzt ganz scharf (vorher 30 % weich).
+- **Einstellungsblatt:** Ist es offen, verschwimmt es beim Kippen mit.
+- **„3D-Effekt umkehren“** dreht jetzt Bild und Symbole zusammen.
+- **Unschärfe bleibt:** Die Symbole folgen jetzt derselben Richtung wie das Bild.
+- Das Bild bleibt auf seinem Platz (Schalter „Bild bewegt sich mit“ und „3D: Parallax“ aus).
+
 ## 0.36 – Unschärfe wieder sichtbar
 
 - Fehler aus 0.35: Das scharf davorgelegte Motiv hat die Unschärfe beim Kippen verdeckt.

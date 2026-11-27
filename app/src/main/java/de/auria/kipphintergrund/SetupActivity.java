@@ -329,7 +329,7 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
         p.addView(row("3D-Effekt: Symbole stechen hervor", "Wie im Video: Die weggekippte Seite bleibt scharf und hell, die andere verschwimmt und verblasst (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH, true)));
-        p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird.",
+        p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird. Gilt für Bild und Symbole zusammen.",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH_FLIP, false)));
         p.addView(row("3D: Motiv hervorheben", "Das Motiv im Foto bleibt scharf, dahinter verblasst es. Nichts bewegt sich.",
                 prefSwitch(preferences, PhotoStore.SUBJECT_3D, true)));

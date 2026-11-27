@@ -100,6 +100,16 @@ public final class TiltWallpaperService extends WallpaperService {
         private final float[] subjectBox = new float[4];
         private volatile boolean subject3d = true;
         private volatile boolean parallax;
+        // 0.37: „3D-Effekt umkehren“ gilt auch für das Bild (Einstellung liegt beim Startbildschirm)
+        private volatile boolean flip;
+        private SharedPreferences launcherPrefs;
+        private final float[] ramp = new float[3];
+        private final SharedPreferences.OnSharedPreferenceChangeListener flipListener = (prefs, key) -> {
+            if (SettingsSheet.DEPTH_FLIP.equals(key)) {
+                flip = prefs.getBoolean(key, false);
+                scheduleFrame();
+            }
+        };
         private int subjectGeneration;
         private final Paint subjectPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
         private WallpaperColors colors;
@@ -179,6 +189,9 @@ public final class TiltWallpaperService extends WallpaperService {
             setOffsetNotificationsEnabled(true);
             preferences = PhotoStore.preferences(TiltWallpaperService.this);
             preferences.registerOnSharedPreferenceChangeListener(this);
+            launcherPrefs = getSharedPreferences("launcher", Context.MODE_PRIVATE);
+            launcherPrefs.registerOnSharedPreferenceChangeListener(flipListener);
+            flip = launcherPrefs.getBoolean(SettingsSheet.DEPTH_FLIP, false);
             sensors = getSystemService(SensorManager.class);
             sensor = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
             if (sensor == null) sensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
@@ -295,6 +308,7 @@ public final class TiltWallpaperService extends WallpaperService {
             syncSensor();
             stopFrames();
             preferences.unregisterOnSharedPreferenceChangeListener(this);
+            launcherPrefs.unregisterOnSharedPreferenceChangeListener(flipListener);
             if (receiverRegistered) {
                 try { unregisterReceiver(screenReceiver); } catch (RuntimeException ignored) {}
                 receiverRegistered = false;
@@ -725,15 +739,19 @@ public final class TiltWallpaperService extends WallpaperService {
                 // Als Farbfilter direkt auf dem Bild statt als eigene Vollbild-Ebene: ein Zeichendurchgang weniger.
                 float dark = Effects.dim(enabled && frost ? Effects.frostDim(movement) : 0f, unlock, zoomed, page);
                 LightingColorFilter dimFilter = dimFilter(DrawMath.dimLevel(dark));
+                float dirX = heldWins ? heldDirX : px;
+                float dirY = heldWins ? heldDirY : py;
+                float blurX = Depth3d.blurX(dirX, flip);
+                float blurY = Depth3d.blurY(dirY, flip);
                 if (!isPreview()) {
                     // Eigener Startbildschirm (gleicher Prozess): Symbole und Widgets im selben Bildtakt mitnehmen
+                    // 0.37: dieselbe Kipprichtung wie für den Verlauf des Bildes (auch bei „Unschärfe bleibt“)
                     TiltBus.publish(tiltSoft, enabled && frost ? Effects.frostDim(movement) : 0f, unlock,
-                            enabled ? px : 0f, enabled ? py : 0f);
+                            enabled ? dirX : 0f, enabled ? dirY : 0f);
                 }
                 paint.setColorFilter(dimFilter);
                 gradientPaint.setColorFilter(dimFilter);
-                if (heldWins) Effects.blurSide(heldDirX, heldDirY, blurDir);
-                else Effects.blurSide(px, py, blurDir);
+                Effects.blurSide(blurX, blurY, blurDir);
 
                 canvas.save();
                 if (unlock > 0) {
@@ -748,8 +766,9 @@ public final class TiltWallpaperService extends WallpaperService {
                     boolean slope = tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
                     if (slope) {
                         // Die Seite, die zum Betrachter kommt, voll weich; die Seite, die nach hinten geht, nur zum Teil
-                        drawSoftSlope(canvas, width, height,
-                                Math.max(evenSoft, tiltSoft * Effects.AWAY_SOFT), tiltSoft);
+                        // 0.37: gleicher Verlauf wie bei den Symbolen – die weggekippte Seite bleibt scharf
+                        Depth3d.ramp((float) Math.hypot(blurX, blurY), ramp);
+                        drawSoftSlope(canvas, width, height, Math.max(evenSoft, tiltSoft * ramp[2]), tiltSoft);
                     } else {
                         float alpha = Math.min(1f, Math.max(evenSoft, tiltSoft));
                         if (alpha > 0) {
@@ -851,9 +870,11 @@ public final class TiltWallpaperService extends WallpaperService {
             // Verlauf von der hinteren zur vorderen Seite legen: Länge, Richtung, Startpunkt
             float cx = width / 2f, cy = height / 2f;
             float reach = Math.max(1f, Math.abs(blurDir[0]) * width / 2f + Math.abs(blurDir[1]) * height / 2f);
-            maskMatrix.setScale(2 * reach, 2 * reach);
+            // 0.37: Übergang dort, wo auch die Symbole von scharf nach unscharf wechseln (ramp)
+            float length = Math.max(1f, (ramp[1] - ramp[0]) * reach);
+            maskMatrix.setScale(length, length);
             maskMatrix.postRotate((float) Math.toDegrees(Math.atan2(blurDir[1], blurDir[0])));
-            maskMatrix.postTranslate(cx - blurDir[0] * reach, cy - blurDir[1] * reach);
+            maskMatrix.postTranslate(cx + blurDir[0] * ramp[0] * reach, cy + blurDir[1] * ramp[0] * reach);
             slopeMask.setLocalMatrix(maskMatrix);
             gradientPaint.setAlpha(Math.round(255 * second));
             canvas.drawRect(destination, gradientPaint);

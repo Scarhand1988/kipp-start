@@ -2023,13 +2023,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     }
 
     private void applyDepth(int blurTarget, int dimTarget, float soft) {
-        float dx = TiltBus.dirX();
-        // 0.32: wie im Video bleibt die weggekippte (tiefer liegende) Kante scharf – auch nach oben und unten
-        float dy = -TiltBus.dirY();
-        if (depthFlip) {
-            dx = -dx;
-            dy = -dy;
-        }
+        // 0.37: scharf ist die Gegenseite der Unschärfe des Hintergrunds – dieselbe Richtung für Bild und Symbole
+        float dx = -Depth3d.blurX(TiltBus.dirX(), depthFlip);
+        float dy = -Depth3d.blurY(TiltBus.dirY(), depthFlip);
         int width = content.getWidth();
         int height = content.getHeight();
         if (width <= 0 || height <= 0) return;
@@ -2042,6 +2038,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         if (dock != null) {
             for (int i = 0; i < dock.getChildCount(); i++) depthView(dock.getChildAt(i), blurTarget, dimTarget, soft, dx, dy, width, height);
         }
+        applySheetDepth(blurTarget, dx, dy);
         // Symbole anderer Seiten (nach dem Blättern) wieder auf normal setzen
         java.util.Iterator<java.util.Map.Entry<View, int[]>> it = depthState.entrySet().iterator();
         while (it.hasNext()) {
@@ -2080,6 +2077,59 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         depthTouched.add(view);
     }
 
+    // 0.37: Offenes Einstellungsblatt verschwimmt mit, mit demselben Verlauf (wie im Video)
+    private boolean sheetBlurred;
+    private int sheetBlur;
+    private float sheetDx;
+    private float sheetDy;
+    private final float[] sheetRamp = new float[3];
+
+    private void applySheetDepth(int blurTarget, float dx, float dy) {
+        if (sheet == null || !sheet.isOpen() || blurTarget <= 0 || sheet.getWidth() <= 0) {
+            clearSheetDepth();
+            return;
+        }
+        if (sheetBlurred && Math.abs(blurTarget - sheetBlur) < LauncherMath.BLUR_STEP
+                && Math.abs(dx - sheetDx) < .01f && Math.abs(dy - sheetDy) < .01f) return;
+        sheetBlur = blurTarget;
+        sheetDx = dx;
+        sheetDy = dy;
+        float m = (float) Math.hypot(dx, dy);
+        if (m < 1e-4f) {
+            clearSheetDepth();
+            return;
+        }
+        float bx = -dx / m, by = -dy / m;
+        Depth3d.ramp(m, sheetRamp);
+        float w = sheet.getWidth(), h = sheet.getHeight();
+        float reach = Math.abs(bx) * w / 2f + Math.abs(by) * h / 2f;
+        float cx = w / 2f, cy = h / 2f;
+        int keep = Math.round(255f * (1f - sheetRamp[2]));
+        android.graphics.LinearGradient mask = new android.graphics.LinearGradient(
+                cx + bx * sheetRamp[0] * reach, cy + by * sheetRamp[0] * reach,
+                cx + bx * sheetRamp[1] * reach, cy + by * sheetRamp[1] * reach,
+                keep << 24, 0, android.graphics.Shader.TileMode.CLAMP);
+        // scharfe Fassung nur dort, wo die Maske deckt; darunter die weiche
+        android.graphics.RenderEffect sharp = android.graphics.RenderEffect.createBlendModeEffect(
+                android.graphics.RenderEffect.createShaderEffect(mask),
+                android.graphics.RenderEffect.createOffsetEffect(0f, 0f), android.graphics.BlendMode.SRC_IN);
+        android.graphics.RenderEffect soft = android.graphics.RenderEffect.createBlurEffect(
+                blurTarget, blurTarget, android.graphics.Shader.TileMode.CLAMP);
+        try {
+            sheet.setRenderEffect(android.graphics.RenderEffect.createBlendModeEffect(
+                    soft, sharp, android.graphics.BlendMode.SRC_OVER));
+            sheetBlurred = true;
+        } catch (RuntimeException e) {
+            clearSheetDepth();
+        }
+    }
+
+    private void clearSheetDepth() {
+        if (!sheetBlurred || sheet == null) return;
+        sheet.setRenderEffect(null);
+        sheetBlurred = false;
+    }
+
     private void resetDepth(View view) {
         if (view == null) return;
         view.setRenderEffect(null);
@@ -2092,6 +2142,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         for (View view : depthState.keySet()) resetDepth(view);
         depthState.clear();
         depthActive = false;
+        clearSheetDepth();
     }
 
     // ---------- Lebenszyklus ----------

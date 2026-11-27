@@ -24,6 +24,47 @@ final class Depth3d {
     private Depth3d() {}
 
     /**
+     * 0.37: Richtung zur unscharfen Seite (Bildschirm: x nach rechts, y nach unten) aus den Kippwerten.
+     * Gilt für Hintergrund und Symbole gemeinsam; „3D-Effekt umkehren“ dreht beides.
+     */
+    static float blurX(float tiltX, boolean flip) {
+        return flip ? -tiltX : tiltX;
+    }
+
+    static float blurY(float tiltY, boolean flip) {
+        return flip ? -tiltY : tiltY;
+    }
+
+    /**
+     * 0.37: Verlauf der Unschärfe quer über den Bildschirm, genau wie LauncherMath.depthAmount für die Symbole.
+     * Lage q: -1 = scharfe Kante, 1 = unscharfe Kante. out = {qStart, qEnd, minAmount}: bis qStart gilt
+     * minAmount, ab qEnd volle Unschärfe, dazwischen linear.
+     */
+    static void ramp(float magnitude, float[] out) {
+        float m = Math.abs(magnitude);
+        if (m < 1e-4f) {
+            out[0] = -1f;
+            out[1] = 0f;
+            out[2] = 1f;
+            return;
+        }
+        float mm = Math.min(1f, m);
+        float c = .47f + .43f * mm;
+        float s = .5f + mm;
+        float floor = LauncherMath.DEPTH_FLOOR * Math.max(0f, (mm - .7f) / .3f);
+        float k = Math.min(1f, m / LauncherMath.DEPTH_FULL_DIR);
+        out[0] = floor / s - c;
+        out[1] = 1f / s - c;
+        out[2] = 1f - k + k * floor;
+    }
+
+    /** Unschärfe-Anteil 0 … 1 an der Lage q für einen Verlauf aus ramp(). */
+    static float rampAmount(float q, float[] r) {
+        float t = r[1] > r[0] ? clamp((q - r[0]) / (r[1] - r[0]), 0f, 1f) : 1f;
+        return r[2] + (1f - r[2]) * t;
+    }
+
+    /**
      * Deckkraft des scharfen Motivs über dem Bild: Die Kipp-Unschärfe darunter muss durchscheinen,
      * ohne „hervorheben“ (nur Parallax) ganz im gleichen Maß wie der Hintergrund.
      */
