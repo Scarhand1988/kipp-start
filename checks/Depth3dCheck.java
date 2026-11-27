@@ -44,6 +44,13 @@ public final class Depth3dCheck {
         require(Depth3d.shadowAlpha(1f, 0f) == Depth3d.SHADOW_ALPHA, "Voll gekippt: voller Schatten");
         require(Depth3d.shadowAlpha(.2f, 0f) < Depth3d.shadowAlpha(.5f, 0f), "Wächst mit der Neigung");
         require(near(Depth3d.shadowOffset(1f, 20f), -20f) && near(Depth3d.shadowOffset(-.5f, 20f), 10f), "Gegenrichtung");
+        // 0.36: Das Motiv darf die Unschärfe nicht verdecken
+        require(!Depth3d.usable(.6f), "Großes Motiv wird nicht davorgelegt");
+        require(Depth3d.subjectAlpha(0f, 0f, true) == 1f, "Gerade: Motiv deckt voll");
+        float a = Depth3d.subjectAlpha(.85f, 0f, true);
+        require(a < .75f && a > .5f, "Gekippt scheint die Unschärfe durch, Motiv bleibt klar");
+        require(near(Depth3d.subjectAlpha(.85f, 0f, false), .15f), "Nur Parallax: Motiv wird mit weich");
+        require(Depth3d.subjectAlpha(0f, 1f, true) == 0f, "Entsperren: ganz weich");
         System.out.println(passed + " Prüfungen (Depth3d) bestanden");
     }
 }

@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 0.36 – Unschärfe wieder sichtbar
+
+- Fehler aus 0.35: Das scharf davorgelegte Motiv hat die Unschärfe beim Kippen verdeckt.
+- Der wandernde Unschärfe-Verlauf gilt wieder, auch mit „Motiv hervorheben“.
+- Das Motiv wird beim Kippen leicht mit weich; mit Parallax allein im gleichen Maß wie der Hintergrund.
+- Motive, die mehr als das halbe Foto füllen, werden nicht mehr davorgelegt.
+
 ## 0.35 – 3D-Effekt in drei Teilen, jeder einzeln schaltbar
 
 Im Reiter Kippen:

@@ -745,9 +745,7 @@ public final class TiltWallpaperService extends WallpaperService {
                 paint.setAlpha(255);
                 canvas.drawBitmap(photo, null, destination, paint);
                 if (softPhoto != null) {
-                    // 0.35: Steht das Motiv davor, wird der ganze Hintergrund gleichmäßig weich
-                    boolean front = enabled && subject3d && subjectPhoto != null;
-                    boolean slope = !front && tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
+                    boolean slope = tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
                     if (slope) {
                         // Die Seite, die zum Betrachter kommt, voll weich; die Seite, die nach hinten geht, nur zum Teil
                         drawSoftSlope(canvas, width, height,
@@ -764,7 +762,7 @@ public final class TiltWallpaperService extends WallpaperService {
                 if (enabled && subject != null && (subject3d || parallax)) {
                     float subjectDark = subject3d ? Effects.dim(
                             frost ? Effects.frostDim(movement) * Depth3d.SUBJECT_DIM : 0f, unlock, zoomed, page) : dark;
-                    drawSubject(canvas, subject, subjectDark, 1f - evenSoft,
+                    drawSubject(canvas, subject, subjectDark, Depth3d.subjectAlpha(tiltSoft, evenSoft, subject3d),
                             parallax ? px : 0f, parallax ? py : 0f, width, height);
                 }
                 canvas.restore();

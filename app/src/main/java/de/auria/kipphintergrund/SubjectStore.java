@@ -28,7 +28,8 @@ import java.util.concurrent.Executors;
 final class SubjectStore {
     /** Zu diesem Foto gehört der gespeicherte Stand. */
     static final String STAMP = "subject_stamp";
-    static final String STATE = "subject_state";
+    // 0.36: neuer Name, damit Fotos nach der strengeren Grenze neu geprüft werden
+    static final String STATE = "subject_state2";
     /** Ändert sich, sobald ein neuer Ausschnitt fertig ist (der Hintergrund lädt dann neu). */
     static final String MADE = "subject_made";
 
@@ -59,7 +60,7 @@ final class SubjectStore {
 
     static String message(String state) {
         if (OK.equals(state)) return "Motiv erkannt – der 3D-Effekt ist bereit.";
-        if (NONE.equals(state)) return "In diesem Foto ist kein klares Motiv. Wähle eins mit Person, Tier oder Gegenstand im Vordergrund.";
+        if (NONE.equals(state)) return "Kein passendes Motiv: keins erkannt oder es füllt mehr als das halbe Foto. Wähle eins mit Person, Tier oder Gegenstand im Vordergrund.";
         return "Erkennung noch nicht verfügbar. Google lädt das Modul nach – mit Internet in ein paar Minuten erneut versuchen.";
     }
 

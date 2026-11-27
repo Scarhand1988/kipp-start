@@ -16,7 +16,21 @@ final class Depth3d {
     /** Größter Versatz des Icon-Schattens in dp. */
     static final float SHADOW_DP = 7f;
 
+    /** Größter Motiv-Anteil am Foto; darüber würde das Motiv die Unschärfe verdecken. */
+    static final float MAX_COVER = .5f;
+    /** So stark wird das hervorgehobene Motiv beim Kippen mit weich. */
+    static final float SUBJECT_SOFTEN = .4f;
+
     private Depth3d() {}
+
+    /**
+     * Deckkraft des scharfen Motivs über dem Bild: Die Kipp-Unschärfe darunter muss durchscheinen,
+     * ohne „hervorheben“ (nur Parallax) ganz im gleichen Maß wie der Hintergrund.
+     */
+    static float subjectAlpha(float tiltSoft, float evenSoft, boolean highlight) {
+        float keep = 1f - clamp(tiltSoft, 0f, 1f) * (highlight ? SUBJECT_SOFTEN : 1f);
+        return (1f - clamp(evenSoft, 0f, 1f)) * keep;
+    }
 
     private static float clamp(float v, float low, float high) {
         return Math.max(low, Math.min(high, v));
@@ -28,7 +42,7 @@ final class Depth3d {
     }
 
     static boolean usable(float covered) {
-        return covered >= .02f && covered <= .85f;
+        return covered >= .02f && covered <= MAX_COVER;
     }
 
     /** Rahmen {links, oben, rechts, unten} in Anteilen 0 … 1; Rückgabe: Anteil der deckenden Bildpunkte. */
