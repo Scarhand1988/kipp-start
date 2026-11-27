@@ -2,6 +2,7 @@ package de.auria.kipphintergrund;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -24,6 +25,15 @@ final class IconView extends View {
     private final TextPaint text = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF destination = new RectF();
     private boolean showLabel = true;
+    // 0.35: Schwebe-Schatten – einmal je Symbol berechnet, beim Kippen nur verschoben
+    private final Paint shadowPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final int[] shadowOrigin = new int[2];
+    private final RectF shadowArea = new RectF();
+    private Bitmap shadow;
+    private Bitmap shadowSource;
+    private float shadowX;
+    private float shadowY;
+    private int shadowStrength;
 
     IconView(Context context, int iconSize) {
         super(context);
@@ -44,6 +54,35 @@ final class IconView extends View {
         this.showLabel = showLabel;
         setContentDescription(app == null ? null : app.label);
         invalidate();
+    }
+
+    /** Versatz in Pixeln und Deckkraft 0 … 255 (0 = kein Schatten). */
+    void setShadow(float x, float y, int strength) {
+        if (strength == shadowStrength && Math.abs(x - shadowX) < .5f && Math.abs(y - shadowY) < .5f) return;
+        shadowX = x;
+        shadowY = y;
+        shadowStrength = strength;
+        invalidate();
+    }
+
+    private void drawShadow(Canvas canvas, float left, float top) {
+        if (shadowSource != app.icon) {
+            shadowSource = app.icon;
+            Paint blur = new Paint();
+            blur.setMaskFilter(new BlurMaskFilter(Math.max(1f, app.icon.getWidth() * .08f), BlurMaskFilter.Blur.NORMAL));
+            try {
+                shadow = app.icon.extractAlpha(blur, shadowOrigin);
+            } catch (RuntimeException e) {
+                shadow = null;
+            }
+        }
+        if (shadow == null) return;
+        float f = iconSize / (float) app.icon.getWidth();
+        float x = left + shadowOrigin[0] * f + shadowX;
+        float y = top + shadowOrigin[1] * f + shadowY;
+        shadowArea.set(x, y, x + shadow.getWidth() * f, y + shadow.getHeight() * f);
+        shadowPaint.setColor(shadowStrength << 24);
+        canvas.drawBitmap(shadow, null, shadowArea, shadowPaint);
     }
 
     Bitmap icon() {
@@ -68,6 +107,7 @@ final class IconView extends View {
         canvas.save();
         canvas.scale(scale, scale, getWidth() / 2f, top + iconSize / 2f);
         destination.set(left, top, left + iconSize, top + iconSize);
+        if (shadowStrength > 0) drawShadow(canvas, left, top);
         canvas.drawBitmap(app.icon, null, destination, iconPaint);
         canvas.restore();
         if (showLabel) {

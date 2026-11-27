@@ -95,6 +95,13 @@ public final class TiltWallpaperService extends WallpaperService {
         private Handler sensorHandler;
         private volatile Bitmap photo;
         private volatile Bitmap softPhoto;
+        // 0.35: ausgeschnittenes Motiv (nur im Zeichen-Thread gesetzt) und sein Rahmen in Anteilen 0 … 1
+        private volatile Bitmap subjectPhoto;
+        private final float[] subjectBox = new float[4];
+        private volatile boolean subject3d = true;
+        private volatile boolean parallax;
+        private int subjectGeneration;
+        private final Paint subjectPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
         private WallpaperColors colors;
         private volatile boolean visible;
         private volatile boolean surfaceReady;
@@ -296,6 +303,8 @@ public final class TiltWallpaperService extends WallpaperService {
             synchronized (drawLock) {
                 retire(photo);
                 retire(softPhoto);
+                retire(subjectPhoto);
+                subjectPhoto = null;
                 photo = null;
                 softPhoto = null;
                 recycleRetired();
@@ -339,6 +348,8 @@ public final class TiltWallpaperService extends WallpaperService {
             enabled = preferences.getBoolean(PhotoStore.ENABLED, true);
             frost = preferences.getBoolean(PhotoStore.FROST, true);
             shift = preferences.getBoolean(PhotoStore.SHIFT, false);
+            subject3d = preferences.getBoolean(PhotoStore.SUBJECT_3D, true);
+            parallax = preferences.getBoolean(PhotoStore.PARALLAX, false);
             unlockAnimation = preferences.getBoolean(PhotoStore.UNLOCK, true);
             zoomBlur = preferences.getBoolean(PhotoStore.ZOOM_BLUR, true);
             holdBlur = preferences.getBoolean(PhotoStore.HOLD_BLUR, false);
@@ -363,6 +374,8 @@ public final class TiltWallpaperService extends WallpaperService {
 
         @Override public void onSharedPreferenceChanged(SharedPreferences settings, String key) {
             readOptions();
+            if (SubjectStore.MADE.equals(key) || PhotoStore.SUBJECT_3D.equals(key)
+                    || PhotoStore.PARALLAX.equals(key)) loadSubject();
             if (PhotoStore.IMAGE.equals(key)) loadPhoto();
             else if (PhotoStore.BLUR.equals(key) || PhotoStore.FOCUS.equals(key)
                     || PhotoStore.UNLOCK.equals(key) || PhotoStore.ZOOM_BLUR.equals(key)
@@ -379,8 +392,49 @@ public final class TiltWallpaperService extends WallpaperService {
 
         @Override public WallpaperColors onComputeColors() { return colors; }
 
+        /** Motiv-Ausschnitt laden oder erzeugen; ohne 3D-Schalter wird er freigegeben. */
+        private void loadSubject() {
+            int gen = ++subjectGeneration;
+            boolean wanted = subject3d || parallax;
+            loader.execute(() -> {
+                Bitmap cut = wanted ? SubjectStore.load(TiltWallpaperService.this) : null;
+                float[] box = new float[4];
+                if (cut != null) {
+                    int[] pixels = new int[cut.getWidth() * cut.getHeight()];
+                    cut.getPixels(pixels, 0, cut.getWidth(), 0, 0, cut.getWidth(), cut.getHeight());
+                    Depth3d.measure(pixels, cut.getWidth(), cut.getHeight(), box);
+                    Bitmap gpu = null;
+                    try {
+                        gpu = cut.copy(Bitmap.Config.HARDWARE, false);
+                    } catch (RuntimeException ignored) {}
+                    if (gpu != null) {
+                        cut.recycle();
+                        cut = gpu;
+                    }
+                } else if (wanted) {
+                    SubjectStore.ensure(TiltWallpaperService.this, null); // fertig -> MADE -> neu laden
+                }
+                Bitmap ready = cut;
+                drawHandler.post(() -> {
+                    if (destroyed || gen != subjectGeneration) {
+                        if (ready != null) ready.recycle();
+                        return;
+                    }
+                    if (subjectPhoto != ready) retire(subjectPhoto);
+                    System.arraycopy(box, 0, subjectBox, 0, 4);
+                    subjectPhoto = ready;
+                    scheduleFrame();
+                });
+            });
+        }
+
         private void loadPhoto() {
             int generation = ++imageGeneration;
+            // Alten Ausschnitt nie über ein neues Foto legen
+            drawHandler.post(() -> {
+                retire(subjectPhoto);
+                subjectPhoto = null;
+            });
             int softGen = ++softGeneration;
             float strength = blurStrength;
             boolean needed = softNeeded();
@@ -447,6 +501,7 @@ public final class TiltWallpaperService extends WallpaperService {
                     scheduleFrame();
                 });
             });
+            loadSubject();
         }
 
         /** Neue Unschärfe-Stärke eingestellt: nur die weiche Version neu berechnen, das scharfe Foto bleibt. */
@@ -515,7 +570,7 @@ public final class TiltWallpaperService extends WallpaperService {
         private void recycleRetiredLocked() {
             if (retired.isEmpty()) return;
             for (Bitmap bitmap : retired) {
-                if (bitmap != photo && bitmap != softPhoto) bitmap.recycle();
+                if (bitmap != photo && bitmap != softPhoto && bitmap != subjectPhoto) bitmap.recycle();
             }
             retired.clear();
         }
@@ -690,7 +745,9 @@ public final class TiltWallpaperService extends WallpaperService {
                 paint.setAlpha(255);
                 canvas.drawBitmap(photo, null, destination, paint);
                 if (softPhoto != null) {
-                    boolean slope = tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
+                    // 0.35: Steht das Motiv davor, wird der ganze Hintergrund gleichmäßig weich
+                    boolean front = enabled && subject3d && subjectPhoto != null;
+                    boolean slope = !front && tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
                     if (slope) {
                         // Die Seite, die zum Betrachter kommt, voll weich; die Seite, die nach hinten geht, nur zum Teil
                         drawSoftSlope(canvas, width, height,
@@ -703,12 +760,39 @@ public final class TiltWallpaperService extends WallpaperService {
                         }
                     }
                 }
+                Bitmap subject = subjectPhoto;
+                if (enabled && subject != null && (subject3d || parallax)) {
+                    float subjectDark = subject3d ? Effects.dim(
+                            frost ? Effects.frostDim(movement) * Depth3d.SUBJECT_DIM : 0f, unlock, zoomed, page) : dark;
+                    drawSubject(canvas, subject, subjectDark, 1f - evenSoft,
+                            parallax ? px : 0f, parallax ? py : 0f, width, height);
+                }
                 canvas.restore();
                 if (measure) drawMeter(canvas, width, height);
             } finally {
                 holder.unlockCanvasAndPost(canvas);
                 recycleRetired();
             }
+        }
+
+        /** Motiv über den Hintergrund legen; gerade gehalten deckt es sich genau mit dem Foto. */
+        private void drawSubject(Canvas canvas, Bitmap subject, float dark, float alpha,
+                                 float tiltX, float tiltY, int width, int height) {
+            if (alpha <= 0) return;
+            float shortSide = Math.min(width, height);
+            float dx = Depth3d.shift(tiltX, shortSide);
+            float dy = Depth3d.shift(tiltY, shortSide);
+            float w = destination.width(), h = destination.height();
+            float scale = Depth3d.scale(dx, dy, (subjectBox[2] - subjectBox[0]) * w / 2f,
+                    (subjectBox[3] - subjectBox[1]) * h / 2f);
+            canvas.save();
+            canvas.translate(dx, dy);
+            canvas.scale(scale, scale, destination.left + (subjectBox[0] + subjectBox[2]) * w / 2f,
+                    destination.top + (subjectBox[1] + subjectBox[3]) * h / 2f);
+            subjectPaint.setColorFilter(dimFilter(DrawMath.dimLevel(dark)));
+            subjectPaint.setAlpha(Math.round(255 * Math.min(1f, alpha)));
+            canvas.drawBitmap(subject, null, destination, subjectPaint);
+            canvas.restore();
         }
 
         /** Farbfilter für eine Abdunkel-Stufe 0 … 255 (null = keine Abdunklung). Einmal angelegt, dann wiederverwendet. */

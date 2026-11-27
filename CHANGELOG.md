@@ -1,5 +1,15 @@
 # Änderungsverlauf
 
+## 0.35 – 3D-Effekt in drei Teilen, jeder einzeln schaltbar
+
+Im Reiter Kippen:
+
+- **3D: Motiv hervorheben** (an): Das Motiv im Foto bleibt beim Kippen scharf und hell, der Hintergrund dahinter verschwimmt und verblasst. Nichts bewegt sich.
+- **3D: Parallax** (aus): Das Motiv verschiebt sich leicht vor dem Hintergrund.
+- **3D: Icons schweben** (an): Unter den Icons wandert ein Schatten.
+- Für die Motiv-Erkennung nutzt die App eine Google-Bibliothek (Beta). Das Foto wird auf dem Gerät ausgewertet; das Erkennungsmodul laden die Google-Play-Dienste nach. Die App selbst hat weiter keinen Internetzugriff.
+- Grenze: Ohne klares Motiv im Foto bleiben die ersten beiden Schalter ohne Wirkung.
+
 ## 0.34 – Kipp-Effekt nach vier Standbildern nachgemessen
 
 Vier Standbilder aus dem Video (gerade, leicht, mittel und stark gekippt) ausgemessen und mit 0.33 verglichen. Das Hintergrundbild steht in allen vier Bildern still; es ändern sich nur Helligkeit, Schärfe und Deckkraft. Drei Stellen wichen ab:

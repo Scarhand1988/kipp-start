@@ -109,7 +109,7 @@ final class Backup {
         JSONObject out = new JSONObject();
         for (Map.Entry<String, ?> e : preferences.getAll().entrySet()) {
             Object v = e.getValue();
-            if (PhotoStore.IMAGE.equals(e.getKey()) || v == null) continue;
+            if (PhotoStore.IMAGE.equals(e.getKey()) || SubjectStore.isStateKey(e.getKey()) || v == null) continue;
             JSONObject typed = new JSONObject();
             if (v instanceof Boolean) typed.put("t", "b");
             else if (v instanceof Float) typed.put("t", "f");

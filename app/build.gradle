@@ -57,3 +57,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // 0.35: Motiv-Erkennung auf dem Gerät; das Modell liefern die Google-Play-Dienste (Beta von Google)
+    implementation 'com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1'
+}

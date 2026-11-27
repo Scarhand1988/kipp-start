@@ -111,6 +111,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private int appliedBlur;
     private boolean depthOn = true;
     private boolean depthFlip;
+    private boolean shadowOn = true;
     private boolean depthActive;
     /** 0.30: je Symbol/Widget der zuletzt gesetzte Effekt {blur, dim}. */
     private final java.util.WeakHashMap<View, int[]> depthState = new java.util.WeakHashMap<>();
@@ -199,6 +200,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             case SettingsSheet.DETENT:
             case SettingsSheet.DEPTH:
             case SettingsSheet.DEPTH_FLIP:
+            case SettingsSheet.SHADOW:
                 onLauncherSetting(key, shared.getBoolean(key, !SettingsSheet.DEPTH_FLIP.equals(key)));
                 break;
             default:
@@ -211,6 +213,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         transitionsOn = prefs.getBoolean(SettingsSheet.TRANSITIONS, true);
         depthOn = prefs.getBoolean(SettingsSheet.DEPTH, true);
         depthFlip = prefs.getBoolean(SettingsSheet.DEPTH_FLIP, false);
+        shadowOn = prefs.getBoolean(SettingsSheet.SHADOW, true);
         labelsOn = prefs.getBoolean(SettingsSheet.LABELS, true);
         glowOn = prefs.getBoolean(SettingsSheet.GLOW, true);
         unlockOn = prefs.getBoolean(SettingsSheet.UNLOCK, true);
@@ -1960,6 +1963,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             dark = 0f;
         }
         if (!unlockOn) unlock = 0f;
+        applyShadows();
         // 0.30: Tiefen-Effekt – statt einer gleichmäßigen Unschärfe bekommt jedes Symbol seine eigene:
         // die Seite in Kipprichtung bleibt scharf und wird etwas größer, die andere verschwimmt wie bisher.
         // Beim Entsperren und bei offener App-Übersicht gilt weiter der gleichmäßige Effekt.
@@ -1991,6 +1995,31 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         content.setAlpha(LauncherMath.unlockAlpha(unlock));
         main.removeCallbacks(unlockWatchdog);
         if (unlock > 0) main.postDelayed(unlockWatchdog, 600);
+    }
+
+    /** 0.35: Schwebe-Schatten. Die Symbole bleiben stehen, nur der Schatten wandert. */
+    private void applyShadows() {
+        boolean on = shadowOn && tiltOn;
+        float dx = on ? TiltBus.dirX() : 0f;
+        float dy = on ? TiltBus.dirY() : 0f;
+        if (depthFlip) {
+            dx = -dx;
+            dy = -dy;
+        }
+        float max = Depth3d.SHADOW_DP * density;
+        float x = Depth3d.shadowOffset(dx, max);
+        float y = Depth3d.shadowOffset(dy, max);
+        int strength = Depth3d.shadowAlpha(dx, dy);
+        shadowChildren(workspace == null ? null : workspace.currentLayout(), x, y, strength);
+        shadowChildren(dock, x, y, strength);
+    }
+
+    private void shadowChildren(ViewGroup group, float x, float y, int strength) {
+        if (group == null) return;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof IconView) ((IconView) child).setShadow(x, y, strength);
+        }
     }
 
     private void applyDepth(int blurTarget, int dimTarget, float soft) {

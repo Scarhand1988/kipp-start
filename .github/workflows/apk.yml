@@ -41,10 +41,13 @@ jobs:
             app/src/main/java/de/auria/kipphintergrund/LauncherMath.java \
             checks/MotionCheck.java \
             checks/DrawCheck.java \
-            checks/LauncherCheck.java
+            checks/LauncherCheck.java \
+            app/src/main/java/de/auria/kipphintergrund/Depth3d.java \
+            checks/Depth3dCheck.java
           java -cp build/checks de.auria.kipphintergrund.MotionCheck
           java -cp build/checks de.auria.kipphintergrund.DrawCheck
           java -cp build/checks de.auria.kipphintergrund.LauncherCheck
+          java -cp build/checks de.auria.kipphintergrund.Depth3dCheck
 
       - uses: gradle/actions/setup-gradle@v4
         with:

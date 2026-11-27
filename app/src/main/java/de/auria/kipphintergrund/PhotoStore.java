@@ -36,6 +36,10 @@ final class PhotoStore {
     static final String MEASURE = "measure";
     /** 0.33: Bild verschiebt sich beim Kippen mit (aus = Bild steht still wie im Video). */
     static final String SHIFT = "shift";
+    /** 0.35: Motiv bleibt beim Kippen scharf und hell vor dem verblassenden Hintergrund (Standard: an). */
+    static final String SUBJECT_3D = "subject_3d";
+    /** 0.35: Motiv verschiebt sich beim Kippen leicht gegen den Hintergrund (Standard: aus). */
+    static final String PARALLAX = "parallax";
     /** Ab 0.11 wird das Foto als JPEG gespeichert: deutlich kleiner und schneller zu laden als PNG. */
     private static final String IMAGE_NAME = "photo.jpg";
     /** Bis 0.10 lag das Foto als PNG vor; wird beim ersten Laden einmalig umgewandelt. */

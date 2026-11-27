@@ -331,6 +331,15 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH, true)));
         p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird.",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH_FLIP, false)));
+        p.addView(row("3D: Motiv hervorheben", "Das Motiv im Foto bleibt scharf, dahinter verblasst es. Nichts bewegt sich.",
+                prefSwitch(preferences, PhotoStore.SUBJECT_3D, true)));
+        p.addView(row("3D: Parallax", "Das Motiv verschiebt sich beim Kippen leicht vor dem Hintergrund.",
+                prefSwitch(preferences, PhotoStore.PARALLAX, false)));
+        p.addView(row("3D: Icons schweben", "Ein Schatten wandert beim Kippen unter den Icons (nur Kipp-Start).",
+                prefSwitch(launcherPrefs, SettingsSheet.SHADOW, true)));
+        p.addView(link("Motiv-Erkennung prüfen", () -> SubjectStore.ensure(getApplicationContext(), state ->
+                android.widget.Toast.makeText(getApplicationContext(), SubjectStore.message(state),
+                        android.widget.Toast.LENGTH_LONG).show())));
         p.addView(row("Entsperr-Animation", "Das Bild hebt sich nach dem Entsperren in seine Ruhelage.",
                 prefSwitch(preferences, PhotoStore.UNLOCK, true)));
         p.addView(row("Symbole fliegen herein", "Nach dem Entsperren kommen die Symbole groß und unscharf herein.",
