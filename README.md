@@ -15,13 +15,14 @@
 - **Blättern mit Absatz:** Die Seite bleibt erst stehen, rastet dann aus und blättert von selbst weich weiter. Die neue Seite blendet dabei unscharf ein.
 - **Entsperr-Animation:** Nach dem Entsperren kommen die Symbole groß und unscharf herein und setzen sich an ihren Platz.
 - **Startbildschirm-Grundfunktionen:** Seiten, Dock, App-Übersicht mit Suche, Widgets, Ziehen und Ablegen.
+- **Effekt auch auf dem Pixel-Launcher (ab 0.45):** Über eine Bedienungshilfe verschwimmen beim Kippen auch Symbole und Widgets eines anderen Startbildschirms. Während des Kippens ist der Startbildschirm dabei ein Standbild. Einschalten in der App unter Kippen.
 - **Eigenes Uhr-Widget (ab 0.38):** helles Quadrat mit Strichkranz und großer Uhrzeit, über „Widget hinzufügen“.
 - **Einstellungen:** zwei Finger zusammenziehen oder lange auf eine leere Stelle drücken. Jeder Effekt lässt sich einzeln ausschalten.
 - **Schnellschalter** „Kipp-Effekt“ für die Schnelleinstellungen.
 
 ## Datenschutz
 
-Die App fordert **keinen Internetzugriff** an. Dein Foto bleibt im privaten Speicher der App auf deinem Handy. Es gibt keine Werbung, kein Konto und keine Analyse.
+Die App fordert **keinen Internetzugriff** an. Die freiwillige Bedienungshilfe für den Pixel-Launcher (ab 0.45) verwendet vom Fensterinhalt nur den Namen der App im Vordergrund. Ihre Bildschirmfotos des Startbildschirms bleiben im Speicher und werden weder gespeichert noch gesendet. Bei Apps außerhalb des Play Store sperrt Android den Schalter zunächst: App-Info → ⋮ → „Eingeschränkte Einstellungen zulassen“. Dein Foto bleibt im privaten Speicher der App auf deinem Handy. Es gibt keine Werbung, kein Konto und keine Analyse.
 
 Die iPhone-Web-App speichert dein Foto und deine Einstellungen nur im Speicher des Browsers auf deinem iPhone, es wird nichts hochgeladen. Sie liegt auf GitHub Pages; GitHub speichert beim Aufruf, wie bei jeder Pages-Seite, die IP-Adresse aus Sicherheitsgründen ([GitHub-Hinweis](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection)).
 

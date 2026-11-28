@@ -29,7 +29,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Bewegungs-, Zeichen- und Launcher-Logik prüfen (MotionCheck, DrawCheck, LauncherCheck)
+      - name: Bewegungs-, Zeichen- und Launcher-Logik prüfen (MotionCheck, DrawCheck, LauncherCheck, PixelModeCheck)
         run: |
           mkdir -p build/checks
           javac -encoding UTF-8 -d build/checks \
@@ -43,11 +43,14 @@ jobs:
             checks/DrawCheck.java \
             checks/LauncherCheck.java \
             app/src/main/java/de/auria/kipphintergrund/Depth3d.java \
-            checks/Depth3dCheck.java
+            checks/Depth3dCheck.java \
+            app/src/main/java/de/auria/kipphintergrund/PixelMode.java \
+            checks/PixelModeCheck.java
           java -cp build/checks de.auria.kipphintergrund.MotionCheck
           java -cp build/checks de.auria.kipphintergrund.DrawCheck
           java -cp build/checks de.auria.kipphintergrund.LauncherCheck
           java -cp build/checks de.auria.kipphintergrund.Depth3dCheck
+          java -cp build/checks de.auria.kipphintergrund.PixelModeCheck
 
       - uses: gradle/actions/setup-gradle@v4
         with:

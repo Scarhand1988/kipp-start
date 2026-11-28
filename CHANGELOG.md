@@ -1,5 +1,21 @@
 # Änderungsverlauf
 
+## 0.45 – Kipp-Effekt auch auf dem Pixel-Launcher
+
+- **Neu:** Der Effekt aus dem Video funktioniert jetzt auch auf einem anderen Startbildschirm, zum Beispiel auf dem Pixel-Launcher. Die weggekippte Seite bleibt scharf, die andere wird unscharf, dunkler und farblos. Das gilt für Symbole, Widgets und Hintergrund zusammen.
+- **Wie es geht:** Android lässt keine App in das Fenster einer anderen zeichnen. Deshalb läuft der Effekt über eine Bedienungshilfe („Kipp-Effekt auf dem Pixel-Launcher“). Liegt das Handy gerade und ist der Startbildschirm vorne, macht sie ab und zu ein Bildschirmfoto. Das Foto bleibt nur im Speicher. Beim Kippen legt sie es als nicht berührbares Fenster darüber und zeichnet darauf denselben Verlauf wie Kipp-Start. Tipper und Wischen gehen normal zum Launcher durch.
+- **Einschalten:** In der App „Kipp-Hintergrund“ unter Kippen auf „Kipp-Effekt auch auf dem Pixel-Launcher ›“ tippen. In den Bedienungshilfen dann unter „Installierte Apps“ den Eintrag einschalten. Ist der Schalter gesperrt (Android sperrt ihn bei Apps außerhalb des Play Store), vorher in der App-Info von Kipp-Hintergrund über ⋮ „Eingeschränkte Einstellungen zulassen“ tippen. Der Kipp-Hintergrund muss als Hintergrund aktiv sein, denn von ihm kommen die Kippwerte.
+- **Grenzen:**
+  - Während des Kippens ist der Startbildschirm ein Standbild. Die Uhr im Widget springt zum Beispiel erst danach weiter.
+  - Beim Berühren des Bildschirms, beim Seitenwechsel, beim Öffnen der Benachrichtigungen oder einer App verschwindet das Fenster. Dafür meldet ein unsichtbares 1-Pixel-Fenster jedes Aufsetzen des Fingers. Erst wenn das Handy wieder gerade liegt, entsteht ein neues Foto.
+  - Übersicht und App-Liste laufen beim Pixel-Launcher im selben Paket wie der Startbildschirm. Deshalb gilt der Effekt nur, wenn der Kipp-Hintergrund sichtbar und nicht weggezoomt ist.
+  - Etwas Akku: Bildschirmfotos gibt es nur mit dem Startbildschirm vorne, kurz nach einer Änderung alle 0,7 s und sonst alle 5 s. Welche App vorne ist, prüft die Bedienungshilfe alle 0,3 s, bei Bildschirm aus oder ohne Kipp-Hintergrund nur alle 2 s.
+- **Datenschutz:** Wie jede Bedienungshilfe mit Fensterzugriff bekommt sie von Android Ereignisse anderer Apps. Der Code verwendet davon nur den Paketnamen der App im Vordergrund und die Tatsache, dass getippt oder gescrollt wurde. Die Bildschirmfotos zeigen den Startbildschirm. Sie bleiben nur im Speicher und werden weder gespeichert noch gesendet, und die App hat weiterhin keinen Internetzugriff.
+- Mit Kipp-Start als Startbildschirm ist der Umweg nicht nötig und tut nichts. Dort zeichnet Kipp-Start den Effekt live.
+- 30 neue automatische Prüfungen (`checks/PixelModeCheck`): wann fotografiert wird, wann das Fenster erscheint und welche App als Startbildschirm zählt.
+
+Prüfablauf auf dem Pixel 7 mit Pixel-Launcher: die Bedienungshilfe einschalten, gerade halten und dann nach links und rechts kippen. Die weggekippte Seite muss scharf bleiben. Beim Kippen tippen (das Fenster verschwindet, die App öffnet sich), die Seite wechseln, die Benachrichtigungen herunterziehen und sperren.
+
 ## 0.44 – Kipp-Verlauf, Vorschau und Messwerte
 
 - Tap auf „Vorschau“ zeigt den Startbildschirm zum freien Kippen. Die Zurück-Taste oder „Zurück zu den Einstellungen“ öffnet das Einstellungsfenster wieder.

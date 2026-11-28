@@ -25,10 +25,14 @@ final class TiltBus {
     private static volatile float dirX;
     private static volatile float dirY;
     private static volatile long lastPublish;
+    /** 0.45: Kipp-Effekt auf fremdem Startbildschirm (Bedienungshilfe PixelTiltService) – zweiter Empfänger. */
+    private static volatile Listener overlay;
     private static final Runnable deliver = () -> {
         pending.set(false);
         Listener l = listener;
         if (l != null) l.onTilt(soft, dark, unlock);
+        Listener o = overlay;
+        if (o != null) o.onTilt(soft, dark, unlock);
     };
 
     private TiltBus() {}
@@ -52,6 +56,8 @@ final class TiltBus {
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
             Listener l = listener;
             if (l != null) l.onTilt(soft, dark, unlock);
+            Listener o = overlay;
+            if (o != null) o.onTilt(soft, dark, unlock);
         } else if (pending.compareAndSet(false, true)) {
             MAIN.post(deliver);
         }
@@ -116,6 +122,43 @@ final class TiltBus {
 
     static void clearListener(Listener l) {
         if (listener == l) listener = null;
+    }
+
+    // 0.45: Zustand des Kipp-Hintergrunds für den Pixel-Launcher-Modus (nur der echte Hintergrund, keine Vorschau)
+    private static volatile boolean wallVisible;
+    private static volatile float wallZoom;
+    private static volatile long wallChange;
+
+    /** Hintergrund sichtbar/unsichtbar (z. B. App vorne). */
+    static void setWallpaperVisible(boolean visible) {
+        wallVisible = visible;
+        wallpaperChanged();
+    }
+
+    /** Zoom des Hintergrunds: 0 = Startbildschirm in Ruhe, größer = Benachrichtigungen, Übersicht, App öffnet. */
+    static void setWallpaperZoom(float zoom) {
+        boolean moved = Math.abs(zoom - wallZoom) > .01f;
+        wallZoom = zoom;
+        if (moved) wallpaperChanged();
+    }
+
+    /** Seitenwechsel, Zoom, Sichtbarkeit: der Startbildschirm sieht gleich anders aus als auf dem letzten Foto. */
+    static void wallpaperChanged() {
+        wallChange = SystemClock.uptimeMillis();
+        Listener o = overlay;
+        if (o != null && pending.compareAndSet(false, true)) MAIN.post(deliver);
+    }
+
+    static boolean wallpaperVisible() { return wallVisible; }
+    static float wallpaperZoom() { return wallZoom; }
+    static long wallpaperChange() { return wallChange; }
+
+    static void setOverlayListener(Listener l) {
+        overlay = l;
+    }
+
+    static void clearOverlayListener(Listener l) {
+        if (overlay == l) overlay = null;
     }
 
     /** Wie lange der Hintergrund nichts mehr gemeldet hat (Millisekunden). */

@@ -327,6 +327,15 @@ public final class SetupActivity extends Activity implements android.hardware.Se
                 prefSwitch(preferences, PhotoStore.SHIFT, false)));
         p.addView(row("Symbole kippen mit", "Symbole, Widgets und Dock verschwimmen mit (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.TILT, true)));
+        // 0.45: Effekt auch auf dem Pixel-Launcher – über die Bedienungshilfe „Kipp-Effekt auf dem Pixel-Launcher“
+        pixelLink = link("", () -> {
+            android.widget.Toast.makeText(this, "Unter „Installierte Apps“ „Kipp-Effekt auf dem Pixel-Launcher“ einschalten. "
+                    + "Ist der Schalter gesperrt: App-Info von Kipp-Hintergrund → ⋮ → „Eingeschränkte Einstellungen zulassen“.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            startActivity(new android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        });
+        refreshPixelLink();
+        p.addView(pixelLink);
         p.addView(row("3D-Effekt: Symbole stechen hervor", "Wie im Video: Die weggekippte Seite bleibt scharf und hell, die andere verschwimmt und verblasst (nur Kipp-Start).",
                 prefSwitch(launcherPrefs, SettingsSheet.DEPTH, true)));
         p.addView(row("3D-Effekt umkehren", "Falls die falsche Seite scharf wird. Gilt für Bild und Symbole zusammen.",
@@ -353,6 +362,28 @@ public final class SetupActivity extends Activity implements android.hardware.Se
         if (Build.VERSION.SDK_INT >= 33) {
             p.addView(link("Schalter „Kipp-Effekt“ zu den Schnelleinstellungen", this::requestTile));
         }
+    }
+
+    private TextView pixelLink;
+
+    /** 0.45: Beschriftung nach der Rückkehr aus den Bedienungshilfen aktualisieren. */
+    private void refreshPixelLink() {
+        if (pixelLink != null) {
+            pixelLink.setText(pixelServiceOn() ? "Pixel-Launcher: Kipp-Effekt ist an ›" : "Kipp-Effekt auch auf dem Pixel-Launcher ›");
+        }
+    }
+
+    /** 0.45: Ist die Bedienungshilfe für den Pixel-Launcher eingeschaltet? */
+    private boolean pixelServiceOn() {
+        android.view.accessibility.AccessibilityManager manager = getSystemService(android.view.accessibility.AccessibilityManager.class);
+        if (manager == null) return false;
+        for (android.accessibilityservice.AccessibilityServiceInfo info
+                : manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)) {
+            if (info.getResolveInfo() != null && info.getResolveInfo().serviceInfo != null
+                    && getPackageName().equals(info.getResolveInfo().serviceInfo.packageName)
+                    && PixelTiltService.class.getName().equals(info.getResolveInfo().serviceInfo.name)) return true;
+        }
+        return false;
     }
 
     private void buildPagesPanel(LinearLayout p) {
@@ -798,6 +829,7 @@ public final class SetupActivity extends Activity implements android.hardware.Se
 
     @Override protected void onResume() {
         super.onResume();
+        refreshPixelLink();
         if (sensors != null && sensor != null && preferences.getBoolean(PhotoStore.ENABLED, true)) {
             tracker.reset();
             sensors.registerListener(this, sensor, 10_000);

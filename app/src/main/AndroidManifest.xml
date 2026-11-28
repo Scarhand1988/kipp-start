@@ -68,6 +68,17 @@
             </intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
         </service>
+        <!-- 0.45: Kipp-Effekt auf dem Pixel-Launcher (Bedienungshilfe, muss in den Einstellungen eingeschaltet werden) -->
+        <service
+            android:name=".PixelTiltService"
+            android:exported="true"
+            android:label="@string/pixel_service_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/pixel_tilt_service" />
+        </service>
         <service
             android:name=".ToggleTileService"
             android:exported="true"

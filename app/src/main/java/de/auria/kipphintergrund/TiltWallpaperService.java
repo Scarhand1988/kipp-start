@@ -282,6 +282,7 @@ public final class TiltWallpaperService extends WallpaperService {
         @Override public void onVisibilityChanged(boolean showing) {
             if (visible == showing) return;
             visible = showing;
+            if (!isPreview()) TiltBus.setWallpaperVisible(showing);
             RoleManager roles = getSystemService(RoleManager.class);
             ownDefaultHome = roles != null && roles.isRoleHeld(RoleManager.ROLE_HOME);
             syncHome();
@@ -321,12 +322,14 @@ public final class TiltWallpaperService extends WallpaperService {
         /** Wie beim normalen Hintergrund: in Ruhe vergrößert, beim Öffnen von Benachrichtigungen/Apps 1,0. */
         @Override public void onZoomChanged(float zoom) {
             zoomOut = zoom;
+            if (!isPreview()) TiltBus.setWallpaperZoom(zoom);
             scheduleFrame(); // höchstens einmal pro Bildtakt zeichnen, auch wenn das System öfter meldet
         }
 
         /** Startbildschirm wischt zwischen Seiten. Das Bild bleibt stehen, nur Unschärfe und Abdunklung folgen. */
         @Override public void onOffsetsChanged(float xOffset, float yOffset, float xOffsetStep, float yOffsetStep,
                                                int xPixelOffset, int yPixelOffset) {
+            if (!isPreview()) TiltBus.wallpaperChanged(); // 0.45: Seitenwechsel – Foto des Pixel-Launchers veraltet
             float swipe = enabled && pageBlur ? Effects.pageSwipe(xOffset, xOffsetStep) : 0f;
             if (Math.abs(swipe - pageSwipe) < .002f) return;
             pageSwipe = swipe;
@@ -336,7 +339,10 @@ public final class TiltWallpaperService extends WallpaperService {
         @Override public void onDestroy() {
             destroyed = true;
             visible = false;
-            if (!isPreview()) TiltBus.publish(0f, 0f, 0f);
+            if (!isPreview()) {
+                TiltBus.publish(0f, 0f, 0f);
+                TiltBus.setWallpaperVisible(false);
+            }
             TiltBus.removeHomeObserver(homeObserver);
             TiltBus.clearNeutralHandler(neutral);
             syncSensor();
