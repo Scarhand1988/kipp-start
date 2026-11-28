@@ -191,7 +191,10 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
         switch (event.getEventType()) {
             case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
                 CharSequence pkg = event.getPackageName();
-                if (pkg != null && !getPackageName().contentEquals(pkg)) frontPackage = pkg.toString();
+                // Eigene Fenster (Effekt-Fenster erscheint, Berührungsmelder) sind keine Störung – sonst blendet sich
+                // das Effekt-Fenster sofort nach dem Erscheinen selbst wieder aus
+                if (pkg != null && getPackageName().contentEquals(pkg)) break;
+                if (pkg != null) frontPackage = pkg.toString();
                 homePackage = findHomePackage();
                 disturb("Fenster " + pkg);
                 break;
