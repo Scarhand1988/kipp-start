@@ -15,6 +15,7 @@
 - **Blättern mit Absatz:** Die Seite bleibt erst stehen, rastet dann aus und blättert von selbst weich weiter. Die neue Seite blendet dabei unscharf ein.
 - **Entsperr-Animation:** Nach dem Entsperren kommen die Symbole groß und unscharf herein und setzen sich an ihren Platz.
 - **Startbildschirm-Grundfunktionen:** Seiten, Dock, App-Übersicht mit Suche, Widgets, Ziehen und Ablegen.
+- **Eigenes Uhr-Widget (ab 0.38):** helles Quadrat mit Strichkranz und großer Uhrzeit, über „Widget hinzufügen“.
 - **Einstellungen:** zwei Finger zusammenziehen oder lange auf eine leere Stelle drücken. Jeder Effekt lässt sich einzeln ausschalten.
 - **Schnellschalter** „Kipp-Effekt“ für die Schnelleinstellungen.
 

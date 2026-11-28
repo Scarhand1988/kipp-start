@@ -8,6 +8,10 @@ final class LauncherMath {
     static final int COLUMNS = 4;
     static final int ROWS = 6;
     static final int DOCK = 4;
+    /** 0.39, aus den Standbildern: Symbol etwa 16 % der Bildschirmbreite (Pixel 7: 412 dp → 64 dp). */
+    static final int ICON_DP = 64;
+    /** 0.39: Abstand von der Statusleiste bis zur ersten Reihe (Uhr beginnt im Video gut ein Viertel der Breite unter dem Rand). */
+    static final int PAGE_TOP_DP = 34;
     /** Unschärfe von Symbolen, Widgets und Dock bei voller Kipp-Unschärfe (dp). */
     static final float TILT_BLUR_DP = 18f;
     /** Entsperren wie im Video: Symbole starten 35 % größer, unscharf und unsichtbar. */
@@ -337,5 +341,203 @@ final class LauncherMath {
     static float depthCoord(float center, float size) {
         if (size <= 0) return 0f;
         return Math.max(-1f, Math.min(1f, center / size * 2f - 1f));
+    }
+
+    // ---------- 0.42: Übergangseffekte ----------
+
+    static final int STYLE_BLUR = 0;
+    static final int STYLE_DEPTH = 1;
+    static final int STYLE_CUBE = 2;
+    static final String[] STYLE_NAMES = {"Unschärfe", "Tiefe", "Würfel"};
+    /** Tiefe: die weggehende Seite tritt bis auf 85 % zurück und verblasst. */
+    static final float DEPTH_PAGE_SCALE = .15f;
+    /** Rückkehr aus einer App: Startbildschirm setzt sich von 106 % in 0,32 s auf seinen Platz. */
+    static final float RETURN_SCALE = 1.06f;
+    static final long RETURN_MS = 320;
+
+    static int pageStyle(int value) {
+        return value < STYLE_BLUR || value > STYLE_CUBE ? STYLE_BLUR : value;
+    }
+
+    /**
+     * Seite beim Blättern je Stil: {@code out} = {Deckkraft, Maßstab, Drehung um die senkrechte Achse (Grad),
+     * Drehpunkt x als Anteil der Breite, Unschärfe 0 … 1, Verschiebung x als Anteil der Breite, Ebene (-1 = dahinter)}.
+     * {@code offset}: 0 = Mitte, ±1 = eine Seite daneben.
+     */
+    static void pageLook(int style, float offset, float[] out) {
+        float o = Math.max(-1f, Math.min(1f, offset));
+        float a = Math.abs(o);
+        out[5] = 0f;
+        out[6] = 0f;
+        switch (pageStyle(style)) {
+            case STYLE_DEPTH:
+                // 0.43: Seiten liegen hintereinander – die linke gleitet normal, die rechte bleibt dahinter liegen
+                // und tritt aus der Tiefe (85 %) nach vorn
+                out[2] = 0f;
+                out[3] = .5f;
+                out[4] = 0f;
+                if (o <= 0f) {
+                    out[0] = 1f;
+                    out[1] = 1f;
+                } else {
+                    out[0] = 1f - o;
+                    out[1] = 1f - DEPTH_PAGE_SCALE * o;
+                    out[5] = -o;
+                    out[6] = -1f;
+                }
+                break;
+            case STYLE_CUBE:
+                out[0] = 1f - .35f * a;
+                out[1] = 1f;
+                out[2] = 90f * o;
+                out[3] = o < 0f ? 1f : 0f;
+                out[4] = 0f;
+                break;
+            default:
+                out[0] = pageAlpha(o);
+                out[1] = pageScale(o);
+                out[2] = 0f;
+                out[3] = .5f;
+                out[4] = pageBlur(o);
+                break;
+        }
+    }
+
+    // ---------- 0.41: Flüssige Ordner und Leuchteffekt ----------
+
+    /** Ordner wächst in 0,42 s aus seinem Symbol und schwingt leicht über (Nachfedern). */
+    static final long LIQUID_OPEN_MS = 420;
+    static final long LIQUID_CLOSE_MS = 240;
+    static final float LIQUID_OVERSHOOT = 1.4f;
+    /** Lichtschein: warmes Weiß, bis 55 % deckend, Radius 0,8 × Symbolgröße. */
+    static final int GLOW_COLOR = 0xFFFFF1DC;
+    static final float GLOW_MAX_ALPHA = .55f;
+    static final float GLOW_RADIUS = .8f;
+    static final long TAP_GLOW_MS = 450;
+
+    /**
+     * Startlage des Ordners: so verschoben und verkleinert, dass er genau auf dem Symbol liegt.
+     * {@code out} = {Verschiebung x, Verschiebung y, Maßstab x, Maßstab y}; Drehpunkt ist die Mitte des Ordners.
+     */
+    static void liquidStart(float iconCx, float iconCy, float iconSize, float cardCx, float cardCy, float cardW, float cardH,
+                            float[] out) {
+        out[0] = iconCx - cardCx;
+        out[1] = iconCy - cardCy;
+        out[2] = cardW <= 0 ? 1f : Math.max(.05f, Math.min(1f, iconSize / cardW));
+        out[3] = cardH <= 0 ? 1f : Math.max(.05f, Math.min(1f, iconSize / cardH));
+    }
+
+    /** Lichtschein auf Zehntel gerundet (0 … 1). */
+    static float glowStep(float strength) {
+        return Math.round(Math.max(0f, Math.min(1f, strength)) * 10f) / 10f;
+    }
+
+    /**
+     * Lichtschein beim Kippen: nur hinter der scharfen Seite ({@code amount} 0 = scharf, 1 = unscharf) und erst,
+     * wenn das Handy merklich gekippt ist ({@code tilt} 0 … 1).
+     */
+    static float glowAmount(float amount, float tilt) {
+        float sharp = 1f - Math.max(0f, Math.min(1f, amount));
+        float t = Math.max(0f, Math.min(1f, (tilt - .1f) / .5f));
+        return sharp * sharp * t;
+    }
+
+    // ---------- 0.40: Einstellungs-Fenster ----------
+
+    /** Fenster gleitet in 0,3 s von unten hoch (Video), schließt etwas schneller. */
+    static final long SHEET_OPEN_MS = 300;
+    static final long SHEET_CLOSE_MS = 220;
+    /** Unschärfe des Startbildschirms hinter dem offenen Fenster (dp). */
+    static final float SHEET_BLUR_DP = 22f;
+    /** Befehl an den eigenen Hintergrund: Bild hinter dem Fenster unscharf (z = 0 … 100). */
+    static final String SHEET_COMMAND = "de.auria.kipphintergrund.SHEET_BLUR";
+
+    /** Öffnungsgrad 0 … 1 → Stufe 0 … 100 für den Hintergrund (begrenzt). */
+    static int sheetLevel(float progress) {
+        return Math.round(Math.max(0f, Math.min(1f, progress)) * 100f);
+    }
+
+    /** Öffnungsgrad 0 … 1 → Unschärfe des Startbildschirms in Pixeln. */
+    static int sheetBlurPixels(float progress, float density) {
+        return Math.min(MAX_BLUR_PX, Math.round(Math.max(0f, Math.min(1f, progress)) * SHEET_BLUR_DP * density));
+    }
+
+    // ---------- 0.38: eigenes Uhr-Widget wie im Video ----------
+
+    /** Größe beim Hinzufügen: 2 × 2 Zellen, wie Uhr und Wetter nebeneinander im Video. */
+    static final int CLOCK_W = 2;
+    static final int CLOCK_H = 2;
+    /** Strichkranz: ein Strich pro Minute, jeder fünfte etwas länger. */
+    static final int CLOCK_TICKS = 60;
+    /** Eckradius im Verhältnis zur Seitenlänge (Standbilder: etwa ein Fünftel). */
+    static final float CLOCK_CORNER = .2f;
+    /** Breite der Uhrzeit im Verhältnis zur Seitenlänge. */
+    static final float CLOCK_TEXT_WIDTH = .74f;
+
+    /** Größe ändern: mindestens 2 × 2, höchstens die ganze Seitenbreite. */
+    static int[] clockSpanLimits() {
+        return new int[] {CLOCK_W, CLOCK_H, COLUMNS, Math.min(ROWS, COLUMNS)};
+    }
+
+    /** Uhrzeit wie im Video: Stunde ohne führende Null, Minuten zweistellig („9:05“, „16:17“). */
+    static String clockText(int hour24, int minute, boolean is24) {
+        int h = hour24 % 24;
+        if (!is24) {
+            h %= 12;
+            if (h == 0) h = 12;
+        }
+        int m = Math.max(0, Math.min(59, minute));
+        return h + ":" + (m < 10 ? "0" : "") + m;
+    }
+
+    /** Millisekunden bis zur nächsten vollen Minute (mindestens 1 s, damit kein Dauer-Neuzeichnen entsteht). */
+    static long clockDelay(long nowMillis) {
+        long rest = 60_000L - Math.floorMod(nowMillis, 60_000L);
+        return Math.max(1_000L, rest + 50L);
+    }
+
+    /**
+     * Punkt {@code i} von {@code n} auf dem Rand eines abgerundeten Quadrats (Seite {@code s}, Eckradius {@code r}),
+     * gleichmäßig verteilt, im Uhrzeigersinn ab oben Mitte. {@code out} = {x, y, nx, ny} mit Normale nach außen.
+     */
+    static void clockTick(int i, int n, float s, float r, float[] out) {
+        r = Math.max(0f, Math.min(r, s / 2f));
+        float straight = s - 2f * r;
+        float arc = (float) (Math.PI / 2.0) * r;
+        float perimeter = 4f * straight + 4f * arc;
+        float d = perimeter <= 0f ? 0f : perimeter * Math.floorMod(i, Math.max(1, n)) / (float) Math.max(1, n);
+        // Strecke 0: obere Kante rechte Hälfte
+        if (d <= straight / 2f) { set(out, s / 2f + d, 0f, 0f, -1f); return; }
+        d -= straight / 2f;
+        float[][] corners = {{s - r, r}, {s - r, s - r}, {r, s - r}, {r, r}};
+        double[] start = {-Math.PI / 2.0, 0.0, Math.PI / 2.0, Math.PI};
+        for (int k = 0; k < 4; k++) {
+            if (d <= arc) {
+                double a = start[k] + (r <= 0f ? 0.0 : d / r);
+                float nx = (float) Math.cos(a);
+                float ny = (float) Math.sin(a);
+                set(out, corners[k][0] + r * nx, corners[k][1] + r * ny, nx, ny);
+                return;
+            }
+            d -= arc;
+            float len = k == 3 ? straight / 2f : straight;
+            if (d <= len) {
+                switch (k) {
+                    case 0: set(out, s, r + d, 1f, 0f); return;
+                    case 1: set(out, s - r - d, s, 0f, 1f); return;
+                    case 2: set(out, 0f, s - r - d, -1f, 0f); return;
+                    default: set(out, r + d, 0f, 0f, -1f); return;
+                }
+            }
+            d -= len;
+        }
+        set(out, s / 2f, 0f, 0f, -1f);
+    }
+
+    private static void set(float[] out, float x, float y, float nx, float ny) {
+        out[0] = x;
+        out[1] = y;
+        out[2] = nx;
+        out[3] = ny;
     }
 }

@@ -1,5 +1,81 @@
 # Änderungsverlauf
 
+## 0.43 – Nachbesserungen nach unabhängiger Prüfung
+
+0.38 bis 0.42 von einem zweiten Prüfer durchgesehen, der den Bau nicht mitverfolgt hat. Kein Absturz gefunden; diese Punkte sind behoben:
+
+- **Unschärfe blieb hängen:** Wurde das Einstellungs-Fenster geschlossen (z. B. Home-Taste), während der Finger noch auf „Vorschau“ lag, blieben Startbildschirm und Hintergrund unscharf und das Fenster fing unsichtbar Berührungen ab. Jetzt nicht mehr; während der Vorschau sind „Abbrechen“ und „Fertig“ auch nicht antippbar.
+- **Bildschirm aus oder App gewechselt:** Das Fenster schließt sofort, Startbildschirm und Hintergrund sind danach wieder scharf.
+- **Hintergrund blieb unscharf,** wenn der Befehl an den Hintergrund in einem ungünstigen Moment nicht ankam – er wird jetzt erneut gesendet.
+- **Blätter-Stil Tiefe** wie vorgesehen: nur die hintere Seite tritt zurück, die vordere gleitet unverändert.
+- **Leuchten beim Kippen** zeichnet die Symbole nur noch in Zehntelstufen neu – weniger Last beim Kippen.
+- Änderungsverlauf an den Code angeglichen (Voraussetzungen des Leuchtens, Hinweis zur Hintergrund-Unschärfe, Zahl der Prüfungen in 0.38).
+- 4 neue automatische Prüfungen.
+
+## 0.42 – Übergangseffekte mit Untermenü
+
+Im Einstellungs-Fenster unter „Übergangseffekte ›“:
+
+- **Übergang beim Blättern** (an/aus): Aus schieben sich die Seiten ohne Effekt.
+- **Blätter-Stil** (Auswahl):
+  - **Unschärfe** – wie bisher: die neue Seite blendet unscharf ein und wird in der Mitte klar.
+  - **Tiefe** – die Seiten liegen hintereinander: die linke gleitet zur Seite, die rechte liegt dahinter und tritt aus 85 % Größe nach vorn (rückwärts umgekehrt).
+  - **Würfel** – die Seiten drehen sich wie die Flächen eines Würfels.
+- **Blättern mit Absatz** wie bisher.
+- **Übergang beim Öffnen von Apps** (an): Die App wächst aus ihrem Symbol; zurück auf dem Startbildschirm setzt er sich in 0,32 s von 106 % weich auf seinen Platz. Aus: der normale Übergang des Systems.
+- „Abbrechen“ setzt auch den Blätter-Stil zurück.
+- 10 neue automatische Prüfungen.
+
+## 0.41 – Flüssige Ordner und Leuchteffekt
+
+Beide sind wie im Video zunächst aus und lassen sich im Einstellungs-Fenster einschalten.
+
+- **Flüssige Ordner:** Der Ordner wächst beim Antippen weich aus seinem Symbol heraus und federt leicht nach (0,42 s). Beim Schließen schrumpft er zurück ins Symbol. Aus: wie bisher kurz einblenden.
+- **Leuchteffekt** (Hauptschalter) mit zwei Teilen, einzeln schaltbar unter „Weitere Einstellungen“:
+  - **Leuchten beim Kippen:** warmer Lichtschein hinter den scharfen Symbolen; je schärfer und je stärker gekippt, desto heller. Braucht „Startbildschirm v2“ und den Tiefen-Effekt (Alle Einstellungen → Kippen, standardmäßig an).
+  - **Leuchten beim Antippen:** das Symbol leuchtet kurz auf (0,45 s).
+- 10 neue automatische Prüfungen.
+
+## 0.40 – Einstellungs-Fenster wie im Video
+
+Das Fenster (Zusammenziehen oder lange auf eine leere Stelle drücken) ist nach dem Video neu aufgebaut, auf Deutsch und im Grafit-Kupfer-Look.
+
+- **Öffnen:** gleitet in 0,3 s von unten hoch; Startbildschirm und Hintergrundbild dahinter werden im selben Maß unscharf und beim Schließen wieder scharf.
+- **Oben:** „Abbrechen“ (setzt alles zurück, was seit dem Öffnen umgelegt wurde) und „Fertig“. Auf der Karte ein X zum Schließen.
+- **Einträge in der Reihenfolge des Videos:** Startbildschirm v2 · Übergangseffekte › · Startseite festlegen › · Beschriftung (Auswahl An/Aus) · Flüssige Ordner · Leuchteffekt · Kippen · Vorschau · Alle Symbole neu erzeugen · Weitere Einstellungen ›.
+- **Startbildschirm v2** (an): neue Darstellung beim Kippen – eine Seite scharf, die andere weich, mit Schatten. Aus: Symbole und Widgets verschwimmen gleichmäßig wie vor 0.30.
+- **Vorschau:** gedrückt halten – das Fenster verschwindet, der Startbildschirm ist scharf zu sehen; loslassen holt es zurück.
+- **Übergangseffekte ›:** Unschärfe beim Blättern, Blättern mit Absatz.
+- **Weitere Einstellungen ›:** Leuchten beim Kippen, Leuchten beim Antippen, Glanzrand sowie alle bisherigen Aktionen (Alle Einstellungen, Jetzige Haltung als gerade, Widget hinzufügen, Sichern und Wiederherstellen, Anderen Startbildschirm wählen).
+- Hinweis: Das Hintergrundbild verschwimmt nur, wenn der Kipp-Start-Hintergrund aktiv und der Kipp-Effekt eingeschaltet ist (Schnellkachel oder „Kipp-Effekt an“).
+- Ist „Startbildschirm v2“ aus, wirken auch der Tiefen-Effekt und die schwebenden Symbole aus „Alle Einstellungen“ nicht.
+
+## 0.39 – Aufbau wie im Video
+
+Abstände und Größen aus den geraden Standbildern nachgemessen (Bildschirmbreite als Maßstab).
+
+- **Uhr oben links:** Einmalig legt Kipp-Start die Uhr oben links auf die Startseite, wenn dort 2 × 2 Zellen frei sind. Wer sie entfernt, bekommt sie nicht wieder hingelegt.
+- **Wetter daneben:** Das Wetter-Widget kommt wie bisher von einer anderen App (z. B. Google) über „Widget hinzufügen“; Kipp-Start selbst bleibt ohne Internet.
+- **Größere Symbole:** 64 dp statt 58 dp (im Video etwa 16 % der Bildschirmbreite).
+- **Mehr Abstand oben:** Die erste Reihe beginnt tiefer, wie im Video.
+- **Ohne Beschriftung und ohne Glanzrand** als Grundeinstellung, wie im Video. Wer beides vorher selbst eingeschaltet hatte, behält es; sonst ist es jetzt aus. Beides lässt sich weiter einschalten.
+- **Uhr-Ecken** etwas weniger rund (ein Fünftel der Seitenlänge).
+- Dock unverändert: vier Symbole ohne Leiste, darüber „Suche“.
+
+## 0.38 – Eigenes Uhr-Widget wie im Video
+
+Erster Schritt zum Nachbau des Startbildschirms aus dem Video.
+
+- **Neues Uhr-Widget:** helles, abgerundetes Quadrat mit feinem Strichkranz am Rand (ein Strich pro Minute, jeder fünfte etwas länger) und großer, schmaler, schwarzer Uhrzeit. Selbst gezeichnet, keine fremden Grafiken; die Schrift ist die schmale Android-Systemschrift.
+- **Hinzufügen:** Startbildschirm-Einstellungen → „Widget hinzufügen“ → ganz oben „Kipp-Start – Uhr (2×2)“. Kommt auf den ersten freien Platz; „Rückgängig“ nimmt es wieder weg.
+- **Wie jedes Widget:** lange drücken zum Verschieben, „Größe ändern“ (mindestens 2×2) und „Entfernen“. Beim Kippen verschwimmt und verblasst es mit den Symbolen.
+- **Antippen** öffnet die Uhr-App.
+- **Sparsam:** Die Uhr läuft nur, solange der Startbildschirm sichtbar ist, und zeichnet einmal pro Minute neu.
+- Stunde ohne führende Null („9:05“), richtet sich nach der 12-/24-Stunden-Einstellung des Handys.
+- Wird mit „Sichern und Wiederherstellen“ mitgesichert.
+- Nicht übernommen: zwei kleine Punkte oben im Standbild – ob das Zierde oder eine Sekundenanzeige ist, ist nicht zu erkennen.
+- 13 neue automatische Prüfungen (Uhrzeit, Minutentakt, Lage der Striche).
+
 ## 0.37 – Bild und Symbole verschwimmen gemeinsam, wie im Video
 
 Neun Standbilder aus dem Video verglichen: Hintergrund, Uhr, Icons und Einstellungsblatt verschwimmen wie eine Fläche; scharf bleibt die Kante, die von dir weg kippt. Nichts verschiebt sich.

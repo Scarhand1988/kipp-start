@@ -6,7 +6,9 @@ import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.TypedValue;
@@ -34,6 +36,11 @@ final class IconView extends View {
     private float shadowX;
     private float shadowY;
     private int shadowStrength;
+    // 0.41: Leuchteffekt – Lichtschein hinter dem Symbol (beim Kippen und beim Antippen)
+    private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float glowTilt;
+    private float glowTap;
+    private android.animation.ValueAnimator tapAnimator;
 
     IconView(Context context, int iconSize) {
         super(context);
@@ -65,6 +72,46 @@ final class IconView extends View {
         invalidate();
     }
 
+    /** Lichtschein beim Kippen, 0 … 1 (0 = aus). */
+    void setGlow(float strength) {
+        // 0.43: in Zehntelstufen – sonst zeichnet jedes Symbol beim Kippen in fast jedem Bild neu
+        float s = LauncherMath.glowStep(strength);
+        if (s == glowTilt) return;
+        glowTilt = s;
+        invalidate();
+    }
+
+    /** Kurzes Aufleuchten beim Antippen. */
+    void flash() {
+        if (tapAnimator != null) tapAnimator.cancel();
+        tapAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f);
+        tapAnimator.setDuration(LauncherMath.TAP_GLOW_MS);
+        tapAnimator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        tapAnimator.addUpdateListener(a -> {
+            glowTap = (Float) a.getAnimatedValue();
+            invalidate();
+        });
+        tapAnimator.start();
+    }
+
+    private void drawGlow(Canvas canvas, float left, float top) {
+        float strength = Math.max(glowTilt, glowTap);
+        if (strength <= 0f) return;
+        float cx = left + iconSize / 2f;
+        float cy = top + iconSize / 2f;
+        float radius = iconSize * LauncherMath.GLOW_RADIUS;
+        if (glowPaint.getShader() == null) {
+            glowPaint.setShader(new RadialGradient(0, 0, radius,
+                    new int[] {LauncherMath.GLOW_COLOR, LauncherMath.GLOW_COLOR & 0x00FFFFFF}, new float[] {.35f, 1f},
+                    Shader.TileMode.CLAMP));
+        }
+        glowPaint.setAlpha(Math.round(255 * LauncherMath.GLOW_MAX_ALPHA * strength));
+        canvas.save();
+        canvas.translate(cx, cy);
+        canvas.drawCircle(0, 0, radius, glowPaint);
+        canvas.restore();
+    }
+
     private void drawShadow(Canvas canvas, float left, float top) {
         if (shadowSource != app.icon) {
             shadowSource = app.icon;
@@ -83,6 +130,12 @@ final class IconView extends View {
         shadowArea.set(x, y, x + shadow.getWidth() * f, y + shadow.getHeight() * f);
         shadowPaint.setColor(shadowStrength << 24);
         canvas.drawBitmap(shadow, null, shadowArea, shadowPaint);
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        if (tapAnimator != null) tapAnimator.cancel();
+        glowTap = 0f;
+        super.onDetachedFromWindow();
     }
 
     Bitmap icon() {
@@ -108,6 +161,7 @@ final class IconView extends View {
         canvas.scale(scale, scale, getWidth() / 2f, top + iconSize / 2f);
         destination.set(left, top, left + iconSize, top + iconSize);
         if (shadowStrength > 0) drawShadow(canvas, left, top);
+        drawGlow(canvas, left, top);
         canvas.drawBitmap(app.icon, null, destination, iconPaint);
         canvas.restore();
         if (showLabel) {

@@ -180,6 +180,8 @@ public final class TiltWallpaperService extends WallpaperService {
         private float positionY;
         private float systemMaxScale = MotionMath.DEFAULT_SYSTEM_SCALE;
         private volatile float zoomOut;
+        /** 0.40: Einstellungs-Fenster des eigenen Startbildschirms offen (0 … 1) – Bild dahinter unscharf. */
+        private volatile float sheetSoft;
         private float maxRefreshRate;
 
         @Override public void onCreate(SurfaceHolder holder) {
@@ -289,6 +291,16 @@ public final class TiltWallpaperService extends WallpaperService {
         @Override public void onZoomChanged(float zoom) {
             zoomOut = zoom;
             scheduleFrame(); // höchstens einmal pro Bildtakt zeichnen, auch wenn das System öfter meldet
+        }
+
+        /** 0.40: Befehl vom eigenen Startbildschirm – Einstellungs-Fenster öffnet oder schließt. */
+        @Override public android.os.Bundle onCommand(String action, int x, int y, int z, android.os.Bundle extras,
+                                                     boolean resultRequested) {
+            if (LauncherMath.SHEET_COMMAND.equals(action)) {
+                sheetSoft = Math.max(0f, Math.min(1f, z / 100f));
+                scheduleFrame();
+            }
+            return null;
         }
 
         /** Startbildschirm wischt zwischen Seiten. Das Bild bleibt stehen, nur Unschärfe und Abdunklung folgen. */
@@ -731,6 +743,7 @@ public final class TiltWallpaperService extends WallpaperService {
                 float movement = Math.min(1f, Math.max(tiltMove, held));
                 float unlock = enabled && unlocking ? unlockAmount : 0f;
                 float zoomed = enabled && zoomBlur ? Math.max(0f, Math.min(1f, zoomOut)) : 0f;
+                if (enabled) zoomed = Math.max(zoomed, sheetSoft);
                 float page = enabled && pageBlur ? pageSwipe : 0f;
                 float tiltSoft = SoftFocus.alpha(movement, blurStrength);
                 // Gleichmäßige Unschärfe (Entsperren, Kontrollzentrum, Seitenwechsel) und Kipp-Unschärfe mit Verlauf

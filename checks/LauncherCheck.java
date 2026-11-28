@@ -234,6 +234,101 @@ public final class LauncherCheck {
                 && LauncherMath.depthCoord(100f, 100f) == 1f && LauncherMath.depthCoord(500f, 100f) == 1f
                 && LauncherMath.depthCoord(10f, 0f) == 0f, "Lage auf dem Bildschirm");
 
-        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe, Sicherung, 3D-Effekt.");
+        // 0.38 – eigenes Uhr-Widget
+        require(LauncherMath.clockText(16, 17, true).equals("16:17"), "Uhrzeit wie im Video");
+        require(LauncherMath.clockText(9, 5, true).equals("9:05"), "Stunde ohne führende Null, Minuten zweistellig");
+        require(LauncherMath.clockText(0, 0, false).equals("12:00") && LauncherMath.clockText(13, 30, false).equals("1:30"), "12-Stunden-Anzeige");
+        require(LauncherMath.clockText(0, 7, true).equals("0:07"), "Mitternacht im 24-Stunden-Format");
+        require(LauncherMath.clockDelay(0) == 60_050L && LauncherMath.clockDelay(59_990) >= 1_000L
+                && LauncherMath.clockDelay(30_000) == 30_050L && LauncherMath.clockDelay(-1) >= 1_000L, "Takt zur vollen Minute");
+        int[] cl = LauncherMath.clockSpanLimits();
+        require(cl[0] == 2 && cl[1] == 2 && cl[2] == LauncherMath.COLUMNS && cl[3] >= 2, "Uhr mindestens 2 × 2");
+        float[] tp = new float[4];
+        float side = 200f, rad = 48f;
+        boolean onEdge = true, outward = true, inside = true;
+        float prevAngle = -1f;
+        boolean clockwise = true;
+        for (int i = 0; i < 60; i++) {
+            LauncherMath.clockTick(i, 60, side, rad, tp);
+            if (tp[0] < -1e-3f || tp[0] > side + 1e-3f || tp[1] < -1e-3f || tp[1] > side + 1e-3f) inside = false;
+            boolean onLine = Math.abs(tp[0]) < 1e-3f || Math.abs(tp[1]) < 1e-3f || Math.abs(tp[0] - side) < 1e-3f || Math.abs(tp[1] - side) < 1e-3f;
+            if (!onLine) {
+                float cx = tp[0] < rad ? rad : side - rad, cy = tp[1] < rad ? rad : side - rad;
+                if (Math.abs(Math.hypot(tp[0] - cx, tp[1] - cy) - rad) > 1e-2) onEdge = false;
+            }
+            float mx = tp[0] - side / 2f, my = tp[1] - side / 2f;
+            if (mx * tp[2] + my * tp[3] <= 0f || Math.abs(Math.hypot(tp[2], tp[3]) - 1) > 1e-3) outward = false;
+            float ang = (float) ((Math.atan2(mx, -my) + 2 * Math.PI) % (2 * Math.PI));
+            if (i > 0 && ang < prevAngle - 1e-4f) clockwise = false;
+            prevAngle = ang;
+        }
+        require(inside && onEdge, "Striche liegen genau auf dem abgerundeten Rand");
+        require(outward, "Striche zeigen zur Mitte");
+        require(clockwise, "Striche im Uhrzeigersinn ab oben Mitte");
+        LauncherMath.clockTick(0, 60, side, rad, tp);
+        require(Math.abs(tp[0] - 100f) < 1e-3f && tp[1] == 0f, "Erster Strich oben in der Mitte");
+        LauncherMath.clockTick(15, 60, side, rad, tp);
+        require(Math.abs(tp[0] - side) < 1e-3f && Math.abs(tp[1] - 100f) < 1e-2f, "Viertel nach: rechts in der Mitte");
+        LauncherMath.clockTick(30, 60, side, rad, tp);
+        require(Math.abs(tp[0] - 100f) < 1e-2f && Math.abs(tp[1] - side) < 1e-3f, "Halb: unten in der Mitte");
+        LauncherMath.clockTick(60, 60, side, rad, tp);
+        require(Math.abs(tp[0] - 100f) < 1e-3f && tp[1] == 0f, "Nach einer Runde wieder oben");
+
+        // 0.39 – Aufbau nach den Standbildern
+        require(LauncherMath.ICON_DP >= 60 && LauncherMath.ICON_DP < (412 - 20) / LauncherMath.COLUMNS - 20, "Symbol groß wie im Video, mit Luft zur Nachbarspalte");
+        require(LauncherMath.CLOCK_CORNER > .15f && LauncherMath.CLOCK_CORNER < .25f, "Uhr-Ecken wie im Standbild");
+
+        // 0.40 – Einstellungs-Fenster
+        require(LauncherMath.sheetLevel(0f) == 0 && LauncherMath.sheetLevel(1f) == 100 && LauncherMath.sheetLevel(.5f) == 50
+                && LauncherMath.sheetLevel(-1f) == 0 && LauncherMath.sheetLevel(2f) == 100, "Fenster-Stufe für den Hintergrund begrenzt");
+        require(LauncherMath.sheetBlurPixels(0f, 2.625f) == 0 && LauncherMath.sheetBlurPixels(1f, 2.625f) == Math.round(22f * 2.625f)
+                && LauncherMath.sheetBlurPixels(1f, 10f) <= LauncherMath.MAX_BLUR_PX, "Startbildschirm hinter dem Fenster unscharf, im Cache-Bereich");
+        require(LauncherMath.SHEET_OPEN_MS == 300, "Fenster gleitet in 0,3 s hoch wie im Video");
+
+        // 0.41 – Flüssige Ordner und Leuchteffekt
+        float[] lq = new float[4];
+        LauncherMath.liquidStart(100f, 300f, 64f, 200f, 500f, 256f, 320f, lq);
+        require(lq[0] == -100f && lq[1] == -200f, "Ordner startet genau über dem Symbol");
+        require(Math.abs(lq[2] - .25f) < 1e-5f && Math.abs(lq[3] - .2f) < 1e-5f, "Ordner startet so groß wie das Symbol");
+        LauncherMath.liquidStart(0f, 0f, 500f, 0f, 0f, 100f, 0f, lq);
+        require(lq[2] == 1f && lq[3] == 1f, "Nie größer als die fertige Karte, keine Division durch null");
+        require(LauncherMath.LIQUID_OVERSHOOT > 0f && LauncherMath.LIQUID_OPEN_MS > LauncherMath.LIQUID_CLOSE_MS, "Nachfedern beim Öffnen, Schließen schneller");
+        require(LauncherMath.glowAmount(0f, 0f) == 0f, "Gerade gehalten: kein Lichtschein");
+        require(LauncherMath.glowAmount(0f, 1f) == 1f, "Scharfe Seite, voll gekippt: voller Lichtschein");
+        require(LauncherMath.glowAmount(1f, 1f) == 0f, "Unscharfe Seite: kein Lichtschein");
+        require(LauncherMath.glowAmount(.5f, 1f) < LauncherMath.glowAmount(.2f, 1f), "Je schärfer, desto heller");
+        require(LauncherMath.glowAmount(0f, .3f) < LauncherMath.glowAmount(0f, .5f), "Lichtschein wächst mit der Neigung");
+        require(LauncherMath.glowAmount(-1f, 5f) <= 1f && LauncherMath.glowAmount(2f, -1f) >= 0f, "Lichtschein begrenzt");
+
+        // 0.42 – Übergangseffekte
+        float[] lk = new float[7];
+        require(LauncherMath.pageStyle(-1) == 0 && LauncherMath.pageStyle(7) == 0 && LauncherMath.pageStyle(2) == 2, "Unbekannter Stil → Unschärfe");
+        for (int st = 0; st < 3; st++) {
+            LauncherMath.pageLook(st, 0f, lk);
+            require(lk[0] == 1f && lk[1] == 1f && lk[2] == 0f && lk[4] == 0f, "Stil " + st + ": Seite in der Mitte unverändert");
+        }
+        LauncherMath.pageLook(LauncherMath.STYLE_BLUR, .5f, lk);
+        require(lk[0] == LauncherMath.pageAlpha(.5f) && lk[4] == LauncherMath.pageBlur(.5f), "Unschärfe-Stil wie bisher");
+        LauncherMath.pageLook(LauncherMath.STYLE_DEPTH, 1f, lk);
+        require(Math.abs(lk[1] - .85f) < 1e-5f && lk[0] < .5f && lk[4] == 0f, "Tiefe: Seite tritt zurück und verblasst, ohne Unschärfe");
+        LauncherMath.pageLook(LauncherMath.STYLE_CUBE, .5f, lk);
+        require(lk[2] == 45f && lk[3] == 0f, "Würfel: rechte Seite dreht um ihre linke Kante");
+        LauncherMath.pageLook(LauncherMath.STYLE_CUBE, -.5f, lk);
+        require(lk[2] == -45f && lk[3] == 1f, "Würfel: linke Seite dreht um ihre rechte Kante");
+        LauncherMath.pageLook(LauncherMath.STYLE_CUBE, 3f, lk);
+        require(lk[2] == 90f, "Drehung begrenzt");
+        require(LauncherMath.STYLE_NAMES.length == 3 && LauncherMath.RETURN_SCALE > 1f, "Drei Stile, Rückkehr von etwas größer");
+
+        // 0.43 – Nachbesserungen aus der Gegenprüfung
+        LauncherMath.pageLook(LauncherMath.STYLE_DEPTH, -.5f, lk);
+        require(lk[0] == 1f && lk[1] == 1f && lk[5] == 0f && lk[6] == 0f, "Tiefe: linke Seite gleitet unverändert");
+        LauncherMath.pageLook(LauncherMath.STYLE_DEPTH, .5f, lk);
+        require(lk[5] == -.5f && lk[6] < 0f && Math.abs(lk[1] - .925f) < 1e-5f, "Tiefe: rechte Seite bleibt dahinter liegen und wächst");
+        LauncherMath.pageLook(LauncherMath.STYLE_CUBE, .5f, lk);
+        require(lk[5] == 0f && lk[6] == 0f, "Andere Stile ohne Verschiebung und Ebene");
+        require(LauncherMath.glowStep(.04f) == 0f && LauncherMath.glowStep(.46f) == .5f && LauncherMath.glowStep(2f) == 1f
+                && LauncherMath.glowStep(-1f) == 0f, "Lichtschein in Zehntelstufen");
+
+        System.out.println("OK: " + passed + " Prüfungen – Seitenübergang, Entsperren, Raster, Widgets, Dock, Gesten, Blättern, Absatz, Ruckeln, Ordner, Widget-Größe, Sicherung, 3D-Effekt, Uhr, Einstellungs-Fenster, Ordner, Leuchten, Übergänge.");
     }
 }

@@ -96,6 +96,15 @@ final class Workspace extends ViewGroup {
         applyPageEffects();
     }
 
+    /** 0.42: Blätter-Stil (LauncherMath.STYLE_…). */
+    private int style = LauncherMath.STYLE_BLUR;
+    private final float[] look = new float[7];
+
+    void setStyle(int value) {
+        style = LauncherMath.pageStyle(value);
+        applyPageEffects();
+    }
+
     void setDetent(boolean on) {
         detent = on;
     }
@@ -217,27 +226,39 @@ final class Workspace extends ViewGroup {
             View page = getChildAt(i);
             float offset = (i * width - getScrollX()) / (float) width;
             if (!transitions || Math.abs(offset) < .001f) {
-                page.setAlpha(1f);
-                page.setRenderEffect(null);
-                page.setScaleX(1f);
-                page.setScaleY(1f);
+                plain(page, 1f);
                 continue;
             }
-            if (!LauncherMath.pageVisible(offset)) {
+            if (Math.abs(offset) >= 1f || (style == LauncherMath.STYLE_BLUR && !LauncherMath.pageVisible(offset))) {
                 // Ganz außerhalb (ohnehin unsichtbar): kein Weichzeichnen in jedem Bild (neu in 0.15)
-                page.setAlpha(0f);
-                page.setRenderEffect(null);
-                page.setScaleX(1f);
-                page.setScaleY(1f);
+                plain(page, 0f);
                 continue;
             }
-            page.setAlpha(LauncherMath.pageAlpha(offset));
+            LauncherMath.pageLook(style, offset, look);
+            page.setAlpha(look[0]);
+            page.setScaleX(look[1]);
+            page.setScaleY(look[1]);
+            page.setPivotX(look[3] * page.getWidth());
+            page.setPivotY(page.getHeight() / 2f);
+            if (look[2] != 0f) page.setCameraDistance(12000 * density);
+            page.setRotationY(look[2]);
+            page.setTranslationX(look[5] * page.getWidth());
+            page.setTranslationZ(look[6]);
             // Gerade Pixelstufen: gleiche Stufe = gleiches Effekt-Objekt aus dem Zwischenspeicher, nichts neu weichzuzeichnen
-            page.setRenderEffect(effects.get(LauncherMath.pageBlurPixels(offset, density), 0));
-            float scale = LauncherMath.pageScale(offset);
-            page.setScaleX(scale);
-            page.setScaleY(scale);
+            page.setRenderEffect(look[4] > 0f ? effects.get(LauncherMath.pageBlurPixels(offset, density), 0) : null);
         }
+    }
+
+    private void plain(View page, float alpha) {
+        page.setAlpha(alpha);
+        page.setRenderEffect(null);
+        page.setScaleX(1f);
+        page.setScaleY(1f);
+        page.setRotationY(0f);
+        page.setTranslationX(0f);
+        page.setTranslationZ(0f);
+        page.setPivotX(page.getWidth() / 2f);
+        page.setPivotY(page.getHeight() / 2f);
     }
 
     @Override public boolean dispatchTouchEvent(MotionEvent ev) {

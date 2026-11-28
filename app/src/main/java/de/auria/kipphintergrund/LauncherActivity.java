@@ -110,6 +110,15 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     // Zuletzt gesetzter Kipp-Effekt (0.15): nur bei sichtbarer Änderung neu setzen
     private int appliedBlur;
     private boolean depthOn = true;
+    private boolean homeV2 = true;
+    /** 0.41: Flüssige Ordner und Leuchteffekt (Hauptschalter und Teile). */
+    private boolean liquidOn;
+    /** 0.42: Blätter-Stil und Übergang beim Öffnen von Apps. */
+    private int pageStyle;
+    private boolean appTransitionOn = true;
+    private boolean launchedApp;
+    private boolean glowTiltOn;
+    private boolean glowTapOn;
     private boolean depthFlip;
     private boolean shadowOn = true;
     private boolean depthActive;
@@ -161,7 +170,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         window.setNavigationBarColor(Color.TRANSPARENT);
         window.setNavigationBarContrastEnforced(false);
         density = getResources().getDisplayMetrics().density;
-        iconSize = dp(58);
+        iconSize = dp(LauncherMath.ICON_DP);
         prefs = getSharedPreferences("launcher", MODE_PRIVATE);
         prefs.registerOnSharedPreferenceChangeListener(prefsListener);
         readSettings();
@@ -201,7 +210,17 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             case SettingsSheet.DEPTH:
             case SettingsSheet.DEPTH_FLIP:
             case SettingsSheet.SHADOW:
-                onLauncherSetting(key, shared.getBoolean(key, !SettingsSheet.DEPTH_FLIP.equals(key)));
+            case SettingsSheet.HOME_V2:
+            case SettingsSheet.LIQUID:
+            case SettingsSheet.GLOW_FX:
+            case SettingsSheet.GLOW_TILT:
+            case SettingsSheet.GLOW_TAP:
+            case SettingsSheet.APP_TRANSITION:
+                onLauncherSetting(key, shared.getBoolean(key, SettingsSheet.standard(key)));
+                break;
+            case SettingsSheet.PAGE_STYLE:
+                readSettings();
+                workspace.setStyle(pageStyle);
                 break;
             default:
                 break; // Startbildschirm-Belegung u. a. – nicht hier
@@ -211,11 +230,19 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private void readSettings() {
         tiltOn = prefs.getBoolean(SettingsSheet.TILT, true);
         transitionsOn = prefs.getBoolean(SettingsSheet.TRANSITIONS, true);
-        depthOn = prefs.getBoolean(SettingsSheet.DEPTH, true);
+        // 0.40: „Startbildschirm v2“ aus = Darstellung wie vor 0.30 (alles verschwimmt gleichmäßig, kein Schatten)
+        homeV2 = prefs.getBoolean(SettingsSheet.HOME_V2, true);
+        depthOn = homeV2 && prefs.getBoolean(SettingsSheet.DEPTH, true);
         depthFlip = prefs.getBoolean(SettingsSheet.DEPTH_FLIP, false);
-        shadowOn = prefs.getBoolean(SettingsSheet.SHADOW, true);
-        labelsOn = prefs.getBoolean(SettingsSheet.LABELS, true);
-        glowOn = prefs.getBoolean(SettingsSheet.GLOW, true);
+        shadowOn = homeV2 && prefs.getBoolean(SettingsSheet.SHADOW, true);
+        pageStyle = LauncherMath.pageStyle(prefs.getInt(SettingsSheet.PAGE_STYLE, LauncherMath.STYLE_BLUR));
+        appTransitionOn = prefs.getBoolean(SettingsSheet.APP_TRANSITION, true);
+        liquidOn = prefs.getBoolean(SettingsSheet.LIQUID, SettingsSheet.standard(SettingsSheet.LIQUID));
+        boolean glowFx = prefs.getBoolean(SettingsSheet.GLOW_FX, SettingsSheet.standard(SettingsSheet.GLOW_FX));
+        glowTiltOn = glowFx && prefs.getBoolean(SettingsSheet.GLOW_TILT, true);
+        glowTapOn = glowFx && prefs.getBoolean(SettingsSheet.GLOW_TAP, true);
+        labelsOn = prefs.getBoolean(SettingsSheet.LABELS, SettingsSheet.LABELS_DEFAULT);
+        glowOn = prefs.getBoolean(SettingsSheet.GLOW, SettingsSheet.GLOW_DEFAULT);
         unlockOn = prefs.getBoolean(SettingsSheet.UNLOCK, true);
         detentOn = prefs.getBoolean(SettingsSheet.DETENT, true);
     }
@@ -229,6 +256,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         workspace = new Workspace(this, effects);
         workspace.setCallbacks(this);
         workspace.setTransitions(transitionsOn);
+        workspace.setStyle(pageStyle);
         workspace.setDetent(detentOn);
         content.addView(workspace, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -321,9 +349,9 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private void applyInsets() {
         bottomBar.setPadding(0, 0, 0, insetBottom + dp(6));
         int bottomHeight = dp(14) + dp(2) + dp(30) + dp(12) + dp(84) + insetBottom + dp(6);
-        workspace.setPagePadding(dp(10), insetTop + dp(10), dp(10), bottomHeight);
+        workspace.setPagePadding(dp(10), insetTop + dp(LauncherMath.PAGE_TOP_DP), dp(10), bottomHeight);
         drawer.setInsets(insetTop, insetBottom);
-        sheet.setInsets(insetBottom);
+        sheet.setInsets(insetTop, insetBottom);
         dropBar.setPadding(0, insetTop, 0, 0);
         ViewGroup.LayoutParams params = dropBar.getLayoutParams();
         params.height = insetTop + dp(72);
@@ -341,10 +369,29 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 if (isDestroyed() || generation != loadGeneration) return;
                 index = loaded;
                 if (model.fresh && !index.isEmpty()) seedDefaults();
+                seedClockOnce();
                 drawer.setApps(index.apps);
                 bindAll();
             });
         });
+    }
+
+    /**
+     * 0.39: Uhr wie im Video oben links auf die Startseite – einmalig und nur, wenn dort 2 × 2 Zellen frei sind.
+     * Wer sie entfernt, bekommt sie nicht wieder hingelegt.
+     */
+    private void seedClockOnce() {
+        if (prefs.getBoolean(SettingsSheet.CLOCK_SEEDED, false)) return;
+        boolean hasClock = false;
+        for (HomeModel.Item item : model.items) {
+            if (item.type == HomeModel.Item.CLOCK) hasClock = true;
+        }
+        int page = Math.max(0, Math.min(model.pages - 1, model.defaultPage));
+        if (!hasClock && LauncherMath.fits(model.occupied(page, null), 0, 0, LauncherMath.CLOCK_W, LauncherMath.CLOCK_H)) {
+            model.items.add(HomeModel.Item.clock(page, 0, 0, LauncherMath.CLOCK_W, LauncherMath.CLOCK_H));
+            model.save(this);
+        }
+        prefs.edit().putBoolean(SettingsSheet.CLOCK_SEEDED, true).apply();
     }
 
     /** Erste Belegung: Telefon, Nachrichten, Browser, Kamera ins Dock, dazu bis zu 16 Apps (oben Platz für Widgets). */
@@ -417,6 +464,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             view.setOnLongClickListener(this::onIconLongClick);
             return view;
         }
+        if (item.type == HomeModel.Item.CLOCK) return clockWidget(item);
         AppWidgetProviderInfo info = widgetManager.getAppWidgetInfo(item.widgetId);
         if (info == null) return missingWidget(item);
         AppWidgetHostView host = widgetHost.createView(this, item.widgetId, info);
@@ -453,20 +501,48 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         return view;
     }
 
+    /**
+     * 0.38: eigenes Uhr-Widget wie im Video. Liegt im selben Rahmen wie andere Widgets, damit Verschieben, Entfernen,
+     * Größe ändern und die Kipp-Unschärfe genauso wirken. Antippen öffnet die Uhr-App.
+     */
+    private View clockWidget(HomeModel.Item item) {
+        WidgetView view = new WidgetView(this);
+        view.item = item;
+        view.longPress = this;
+        view.setClickable(true);
+        view.setOnClickListener(v -> openClockApp());
+        ClockView clock = new ClockView(this);
+        view.addView(clock, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        return view;
+    }
+
+    private void openClockApp() {
+        try {
+            startActivity(new Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (ActivityNotFoundException | SecurityException e) {
+            toast("Keine Uhr-App gefunden.");
+        }
+    }
+
     // ---------- Starten ----------
 
     private void onIconClick(View v) {
         IconView icon = (IconView) v;
-        if (icon.item != null && icon.item.type == HomeModel.Item.FOLDER) openFolder(icon.item);
+        if (glowTapOn) icon.flash();
+        if (icon.item != null && icon.item.type == HomeModel.Item.FOLDER) openFolder(icon.item, icon);
         else if (icon.app != null && icon.app.component != null) startApp(icon);
     }
 
     private void startApp(IconView icon) {
         Rect bounds = new Rect();
         icon.getGlobalVisibleRect(bounds);
-        Bundle options = ActivityOptions.makeScaleUpAnimation(icon, 0, 0, icon.getWidth(), icon.getHeight()).toBundle();
+        // 0.42: „Übergang beim Öffnen von Apps“ – an: App wächst aus dem Symbol; aus: normaler Übergang des Systems
+        Bundle options = appTransitionOn
+                ? ActivityOptions.makeScaleUpAnimation(icon, 0, 0, icon.getWidth(), icon.getHeight()).toBundle()
+                : null;
         try {
             launcherApps.startMainActivity(icon.app.component, icon.app.user, bounds, options);
+            launchedApp = true;
         } catch (RuntimeException e) {
             toast("Die App lässt sich nicht starten.");
         }
@@ -503,7 +579,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         LinearLayout card = newMenuCard();
 
         boolean isFolder = icon.app.component == null;
-        if (isFolder) card.addView(menuRow(null, "Ordner öffnen", KippStyle.TEXT, () -> openFolder(drag.item)));
+        if (isFolder) card.addView(menuRow(null, "Ordner öffnen", KippStyle.TEXT, () -> openFolder(drag.item, null)));
         for (android.content.pm.ShortcutInfo shortcut : shortcutsFor(icon.app)) {
             android.graphics.drawable.Drawable image = null;
             try {
@@ -679,11 +755,11 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                     item.page = pageIndex;
                     item.x = cell[0];
                     item.y = cell[1];
-                } else if (target != item && item.type == HomeModel.Item.APP && target.type != HomeModel.Item.WIDGET) {
+                } else if (target != item && item.type == HomeModel.Item.APP && !target.isBlock()) {
                     // 0.27: App auf App = neuer Ordner, App auf Ordner = hinzufügen
                     model.items.remove(item);
                     addToFolderAt(target, item.component);
-                } else if (target != item && target.type != HomeModel.Item.WIDGET) {
+                } else if (target != item && !target.isBlock()) {
                     int oldPage = item.page;
                     int oldX = item.x;
                     int oldY = item.y;
@@ -702,14 +778,14 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
                 if (target == null) {
                     model.dock[d.dockSlot] = null;
                     model.items.add(HomeModel.Item.app(component, pageIndex, cell[0], cell[1]));
-                } else if (target.type != HomeModel.Item.WIDGET) {
+                } else if (!target.isBlock()) {
                     model.dock[d.dockSlot] = null;
                     addToFolderAt(target, component);
                 }
                 break;
             }
             default: {
-                if (target != null && target.type != HomeModel.Item.WIDGET) {
+                if (target != null && !target.isBlock()) {
                     addToFolderAt(target, d.app.component);
                     break;
                 }
@@ -1134,11 +1210,17 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         model.items.add(Math.max(0, Math.min(at, model.items.size())), folder);
     }
 
-    private void openFolder(HomeModel.Item item) {
+    /** 0.41: Symbol, aus dem der offene Ordner gewachsen ist (für „Flüssige Ordner“), und seine Karte. */
+    private View folderSource;
+    private View folderCard;
+    private final float[] liquid = new float[4];
+
+    private void openFolder(HomeModel.Item item, View source) {
         if (item == null || item.type != HomeModel.Item.FOLDER) return;
         closeAppMenu();
         closeFolder();
         openFolderItem = item;
+        folderSource = source;
         folderScrim = new FrameLayout(this);
         folderScrim.setBackgroundColor(0x99000000);
         folderScrim.setOnClickListener(v -> closeFolder());
@@ -1210,11 +1292,55 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         card.setMinimumWidth(Math.min(dp(260), root.getWidth() - dp(32)));
         folderScrim.addView(card, params);
         root.addView(folderScrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        folderCard = card;
         folderScrim.setAlpha(0f);
+        if (liquidOn && source instanceof IconView && source.isAttachedToWindow()) {
+            // 0.41 Flüssige Ordner: Karte liegt zuerst genau auf dem Symbol und wächst dann weich mit Nachfedern
+            card.setAlpha(0f);
+            card.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+                @Override public boolean onPreDraw() {
+                    card.getViewTreeObserver().removeOnPreDrawListener(this);
+                    if (!liquidStart(card, source)) {
+                        card.setAlpha(1f);
+                        return true;
+                    }
+                    card.setTranslationX(liquid[0]);
+                    card.setTranslationY(liquid[1]);
+                    card.setScaleX(liquid[2]);
+                    card.setScaleY(liquid[3]);
+                    card.animate().translationX(0f).translationY(0f).scaleX(1f).scaleY(1f).alpha(1f)
+                            .setDuration(LauncherMath.LIQUID_OPEN_MS)
+                            .setInterpolator(new android.view.animation.OvershootInterpolator(LauncherMath.LIQUID_OVERSHOOT))
+                            .start();
+                    return true;
+                }
+            });
+            folderScrim.animate().alpha(1f).setDuration(200).start();
+            return;
+        }
         card.setScaleX(.9f);
         card.setScaleY(.9f);
         folderScrim.animate().alpha(1f).setDuration(160).start();
         card.animate().scaleX(1f).scaleY(1f).setDuration(180).start();
+    }
+
+    /** Lage des Symbols gegenüber der Ordner-Karte ausrechnen (in {@link #liquid}); false, wenn nicht messbar. */
+    private boolean liquidStart(View card, View source) {
+        if (card.getWidth() <= 0 || card.getHeight() <= 0 || !source.isAttachedToWindow()) return false;
+        int[] at = new int[2];
+        source.getLocationInWindow(at);
+        IconView icon = (IconView) source;
+        float iconCx = at[0] + source.getWidth() / 2f;
+        float iconCy = at[1] + icon.iconTop() + icon.iconSize() / 2f;
+        int[] cardAt = new int[2];
+        card.getLocationInWindow(cardAt);
+        // getLocationInWindow enthält eine laufende Verschiebung/Größe nicht, solange beide 0/1 sind (vor dem Start)
+        float cardCx = cardAt[0] + card.getWidth() / 2f;
+        float cardCy = cardAt[1] + card.getHeight() / 2f;
+        card.setPivotX(card.getWidth() / 2f);
+        card.setPivotY(card.getHeight() / 2f);
+        LauncherMath.liquidStart(iconCx, iconCy, icon.iconSize(), cardCx, cardCy, card.getWidth(), card.getHeight(), liquid);
+        return true;
     }
 
     /** Schließt den Ordner und übernimmt einen geänderten Namen. */
@@ -1223,7 +1349,25 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         HomeModel.Item item = openFolderItem;
         String title = folderTitle != null ? folderTitle.getText().toString().trim() : "";
         if (folderTitle != null) hideKeyboard(folderTitle);
-        root.removeView(folderScrim);
+        FrameLayout scrim = folderScrim;
+        View card = folderCard;
+        View source = folderSource;
+        folderCard = null;
+        folderSource = null;
+        if (liquidOn && card != null && source instanceof IconView && source.isAttachedToWindow()
+                && card.getScaleX() == 1f && card.getTranslationX() == 0f && liquidStart(card, source)) {
+            // 0.41 Flüssige Ordner: zurück ins Symbol, dann weg
+            scrim.setOnClickListener(null);
+            scrim.setClickable(false);
+            scrim.animate().alpha(0f).setDuration(LauncherMath.LIQUID_CLOSE_MS).start();
+            card.animate().translationX(liquid[0]).translationY(liquid[1]).scaleX(liquid[2]).scaleY(liquid[3]).alpha(0f)
+                    .setDuration(LauncherMath.LIQUID_CLOSE_MS)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> root.removeView(scrim))
+                    .start();
+        } else {
+            root.removeView(scrim);
+        }
         folderScrim = null;
         folderTitle = null;
         openFolderItem = null;
@@ -1311,6 +1455,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         CellLayout layout = workspace.page(item.page);
         float cw = layout == null || layout.cellWidth() <= 1 ? dp(90) : layout.cellWidth();
         float ch = layout == null || layout.cellHeight() <= 1 ? dp(110) : layout.cellHeight();
+        if (item.type == HomeModel.Item.CLOCK) return LauncherMath.clockSpanLimits();
         AppWidgetProviderInfo info = widgetManager.getAppWidgetInfo(item.widgetId);
         if (info == null) return new int[] {1, 1, LauncherMath.COLUMNS, LauncherMath.ROWS};
         boolean horizontal = (info.resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0;
@@ -1325,7 +1470,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     }
 
     private void showResize(HomeModel.Item item) {
-        if (item == null || item.type != HomeModel.Item.WIDGET) return;
+        if (item == null || !item.isBlock()) return;
         closeResize();
         // Ein offenes „Rückgängig“ würde sonst auf einen alten Stand zurückspringen
         if (undoState != null) {
@@ -1747,6 +1892,30 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         sheet.open();
     }
 
+    private int sheetBackBlur;
+    private int sheetWallpaperLevel;
+
+    /** 0.40: Fenster offen → Startbildschirm und Hintergrundbild dahinter verschwimmen im selben Maß. */
+    @Override public void onSheetProgress(float progress) {
+        int blur = LauncherMath.sheetBlurPixels(progress, density);
+        if (blur != sheetBackBlur && workspace != null && bottomBar != null) {
+            sheetBackBlur = blur;
+            android.graphics.RenderEffect effect = blur > 0 ? effects.get(blur, 0) : null;
+            workspace.setRenderEffect(effect);
+            bottomBar.setRenderEffect(effect);
+        }
+        int level = LauncherMath.sheetLevel(progress);
+        if (level == sheetWallpaperLevel) return;
+        android.os.IBinder token = getWindow() == null ? null : getWindow().getDecorView().getWindowToken();
+        if (token == null) return; // nicht als gesendet merken – beim nächsten Mal erneut versuchen
+        try {
+            android.app.WallpaperManager.getInstance(this).sendWallpaperCommand(token, LauncherMath.SHEET_COMMAND, 0, 0, level, null);
+            sheetWallpaperLevel = level;
+        } catch (RuntimeException ignored) {
+            // Anderer Hintergrund aktiv: dann bleibt nur der Startbildschirm unscharf
+        }
+    }
+
     @Override public void onExpandNotifications() {
         try {
             Object service = getSystemService("statusbar");
@@ -1818,10 +1987,6 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         } catch (RuntimeException e) {
             providers = new ArrayList<>();
         }
-        if (providers.isEmpty()) {
-            toast("Keine Widgets gefunden.");
-            return;
-        }
         PackageManager pm = getPackageManager();
         CellLayout layout = workspace.currentLayout();
         float cellWidth = layout == null || layout.cellWidth() <= 1 ? dp(90) : layout.cellWidth();
@@ -1840,11 +2005,17 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         }
         Collator collator = Collator.getInstance();
         Collections.sort(entries, (a, b) -> collator.compare((String) a[0], (String) b[0]));
+        // 0.38: das eigene Uhr-Widget steht immer oben
+        entries.add(0, new Object[] {"Kipp-Start – Uhr  (" + LauncherMath.CLOCK_W + "×" + LauncherMath.CLOCK_H + ")", null});
         String[] labels = new String[entries.size()];
         for (int i = 0; i < labels.length; i++) labels[i] = (String) entries.get(i)[0];
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Widget hinzufügen")
-                .setItems(labels, (dialog, which) -> addWidget((AppWidgetProviderInfo) entries.get(which)[1]))
+                .setItems(labels, (dialog, which) -> {
+                    Object info = entries.get(which)[1];
+                    if (info == null) addClock();
+                    else addWidget((AppWidgetProviderInfo) info);
+                })
                 .setNegativeButton("Abbrechen", null)
                 .show();
     }
@@ -1905,26 +2076,45 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         float cellHeight = layout == null || layout.cellHeight() <= 1 ? dp(110) : layout.cellHeight();
         int w = LauncherMath.span(info.targetCellWidth, info.minWidth, cellWidth, LauncherMath.COLUMNS);
         int h = LauncherMath.span(info.targetCellHeight, info.minHeight, cellHeight, LauncherMath.ROWS);
-        int page = workspace.currentPage();
-        int[] spot = null;
-        for (int p = page; p < model.pages && spot == null; p++) {
-            spot = LauncherMath.firstFree(model.occupied(p, null), w, h, 0);
-            if (spot != null) page = p;
-        }
-        if (spot == null && model.pages < HomeModel.MAX_PAGES) {
-            page = model.pages;
-            model.pages++;
-            spot = new int[] {0, 0};
-        }
+        int[] spot = freeSpot(w, h);
         if (spot == null) {
             widgetHost.deleteAppWidgetId(id);
             toast("Kein Platz für das Widget.");
             return;
         }
-        model.items.add(HomeModel.Item.widget(id, page, spot[0], spot[1], w, h));
+        model.items.add(HomeModel.Item.widget(id, spot[0], spot[1], spot[2], w, h));
         model.save(this);
         bindAll();
-        workspace.snapToPage(page, true);
+        workspace.snapToPage(spot[0], true);
+    }
+
+    /** 0.38: eigenes Uhr-Widget auf den ersten freien Platz ab der jetzigen Seite. */
+    private void addClock() {
+        HomeModel before = model.copy();
+        int[] spot = freeSpot(LauncherMath.CLOCK_W, LauncherMath.CLOCK_H);
+        if (spot == null) {
+            toast("Kein Platz für die Uhr.");
+            return;
+        }
+        model.items.add(HomeModel.Item.clock(spot[0], spot[1], spot[2], LauncherMath.CLOCK_W, LauncherMath.CLOCK_H));
+        model.save(this);
+        bindAll();
+        workspace.snapToPage(spot[0], true);
+        offerUndo(before, "Uhr hinzugefügt");
+    }
+
+    /** Erster freier Platz {Seite, Spalte, Zeile} ab der jetzigen Seite; legt bei Bedarf eine neue Seite an. */
+    private int[] freeSpot(int w, int h) {
+        int page = workspace.currentPage();
+        for (int p = page; p < model.pages; p++) {
+            int[] spot = LauncherMath.firstFree(model.occupied(p, null), w, h, 0);
+            if (spot != null) return new int[] {p, spot[0], spot[1]};
+        }
+        if (model.pages < HomeModel.MAX_PAGES) {
+            model.pages++;
+            return new int[] {model.pages - 1, 0, 0};
+        }
+        return null;
     }
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -2074,6 +2264,10 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         // die unscharfe verblasst – dadurch stechen die scharfen Symbole vor dem dunklen Bild hervor.
         float alpha = LauncherMath.depthAlpha(amount, soft);
         if (Math.abs(view.getAlpha() - alpha) > .01f) view.setAlpha(alpha);
+        // 0.41: Leuchteffekt – Lichtschein hinter den scharfen Symbolen
+        if (view instanceof IconView) {
+            ((IconView) view).setGlow(glowTiltOn ? LauncherMath.glowAmount(amount, (float) Math.hypot(dx, dy)) : 0f);
+        }
         depthTouched.add(view);
     }
 
@@ -2136,6 +2330,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         view.setScaleX(1f);
         view.setScaleY(1f);
         view.setAlpha(1f);
+        if (view instanceof IconView) ((IconView) view).setGlow(0f);
     }
 
     private void clearDepth() {
@@ -2169,7 +2364,26 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         } catch (RuntimeException ignored) {}
     }
 
+    /** 0.42: zurück aus einer App – der Startbildschirm setzt sich von etwas größer weich auf seinen Platz. */
+    @Override protected void onResume() {
+        super.onResume();
+        if (!launchedApp) return;
+        launchedApp = false;
+        if (!appTransitionOn || workspace == null || bottomBar == null) return;
+        for (View v : new View[] {workspace, bottomBar}) {
+            v.animate().cancel();
+            v.setPivotX(root.getWidth() / 2f);
+            v.setPivotY(root.getHeight() / 2f - v.getTop());
+            v.setScaleX(LauncherMath.RETURN_SCALE);
+            v.setScaleY(LauncherMath.RETURN_SCALE);
+            v.animate().scaleX(1f).scaleY(1f).setDuration(LauncherMath.RETURN_MS)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+        }
+    }
+
     @Override protected void onStop() {
+        // 0.43: Startbildschirm verlassen oder Bildschirm aus – Fenster zu, Startbildschirm und Hintergrund wieder scharf
+        if (sheet != null) sheet.closeNow();
         super.onStop();
         started = false;
         syncMeter();

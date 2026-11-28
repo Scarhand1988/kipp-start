@@ -20,6 +20,8 @@ final class HomeModel {
         static final int WIDGET = 1;
         /** 0.27: Ordner mit mehreren Apps. */
         static final int FOLDER = 2;
+        /** 0.38: eigenes Uhr-Widget (kein fremdes App-Widget, keine Widget-Nummer). */
+        static final int CLOCK = 3;
         int type;
         final ArrayList<ComponentName> folder = new ArrayList<>();
         String title = "";
@@ -66,6 +68,22 @@ final class HomeModel {
             c.folder.addAll(folder);
             c.title = title;
             return c;
+        }
+
+        static Item clock(int page, int x, int y, int w, int h) {
+            Item item = new Item();
+            item.type = CLOCK;
+            item.page = page;
+            item.x = x;
+            item.y = y;
+            item.w = w;
+            item.h = h;
+            return item;
+        }
+
+        /** Belegt Platz wie ein Widget: kein Ordner, kein Tausch mit Symbolen. */
+        boolean isBlock() {
+            return type == WIDGET || type == CLOCK;
         }
 
         static Item folder(String title, int page, int x, int y) {
@@ -153,6 +171,8 @@ final class HomeModel {
                         item.component = item.folder.get(0);
                         item.folder.clear();
                     }
+                } else if (item.type == Item.CLOCK) {
+                    // nichts weiter: Größe und Platz reichen
                 } else {
                     item.widgetId = o.optInt("widget", -1);
                     if (item.widgetId < 0) continue;
@@ -218,7 +238,7 @@ final class HomeModel {
                 JSONArray apps = new JSONArray();
                 for (ComponentName c : item.folder) apps.put(c.flattenToString());
                 o.put("apps", apps);
-            } else o.put("widget", item.widgetId);
+            } else if (item.type != Item.CLOCK) o.put("widget", item.widgetId);
             list.put(o);
         }
         json.put("items", list);
