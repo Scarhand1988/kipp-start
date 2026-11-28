@@ -3,6 +3,9 @@
     <string name="app_name">Kipp-Hintergrund</string>
     <string name="tile_name">Kipp-Effekt</string>
     <string name="launcher_name">Kipp-Start</string>
+    <string name="pixel_service_name">Kipp-Effekt auf dem Pixel-Launcher</string>
+    <string name="pixel_service_summary">Symbole verschwimmen beim Kippen auch auf einem anderen Startbildschirm.</string>
+    <string name="pixel_service_description">Kipp-Start macht gerade gehalten Bildschirmfotos deines Startbildschirms (nur im Speicher, nichts wird gespeichert oder gesendet) und legt sie beim Kippen mit Unschärfe darüber. Tipper gehen normal zum Startbildschirm durch. Vom Fensterinhalt verwendet Kipp-Start nur, welche App im Vordergrund ist. Während des Kippens ist der Startbildschirm ein Standbild. Der Kipp-Hintergrund muss als Hintergrund aktiv sein.</string>
     <string name="wallpaper_description">Dein Foto bewegt sich sanft, wenn du das Handy kippst.</string>
     <style name="AppTheme" parent="android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:colorAccent">#A5DAD2</item>

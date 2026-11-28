@@ -13,6 +13,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- 0.45: Standard-Startbildschirm (z. B. Pixel-Launcher) erkennen; ohne das sieht Android-11+ nur Kipp-Start selbst -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.DIAL" />
         </intent>
@@ -67,6 +72,17 @@
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
+        </service>
+        <!-- 0.45: Kipp-Effekt auf dem Pixel-Launcher (Bedienungshilfe, muss in den Einstellungen eingeschaltet werden) -->
+        <service
+            android:name=".PixelTiltService"
+            android:exported="true"
+            android:label="@string/pixel_service_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/pixel_tilt_service" />
         </service>
         <service
             android:name=".ToggleTileService"
