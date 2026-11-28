@@ -128,23 +128,25 @@ final class TiltBus {
     private static volatile boolean wallVisible;
     private static volatile float wallZoom;
     private static volatile long wallChange;
+    private static volatile String wallReason = "-";
 
     /** Hintergrund sichtbar/unsichtbar (z. B. App vorne). */
     static void setWallpaperVisible(boolean visible) {
         wallVisible = visible;
-        wallpaperChanged();
+        wallpaperChanged(visible ? "sichtbar" : "verdeckt");
     }
 
     /** Zoom des Hintergrunds: 0 = Startbildschirm in Ruhe, größer = Benachrichtigungen, Übersicht, App öffnet. */
     static void setWallpaperZoom(float zoom) {
         boolean moved = Math.abs(zoom - wallZoom) > .01f;
         wallZoom = zoom;
-        if (moved) wallpaperChanged();
+        if (moved) wallpaperChanged("Zoom");
     }
 
     /** Seitenwechsel, Zoom, Sichtbarkeit: der Startbildschirm sieht gleich anders aus als auf dem letzten Foto. */
-    static void wallpaperChanged() {
+    static void wallpaperChanged(String reason) {
         wallChange = SystemClock.uptimeMillis();
+        wallReason = reason;
         Listener o = overlay;
         if (o != null && pending.compareAndSet(false, true)) MAIN.post(deliver);
     }
@@ -152,6 +154,7 @@ final class TiltBus {
     static boolean wallpaperVisible() { return wallVisible; }
     static float wallpaperZoom() { return wallZoom; }
     static long wallpaperChange() { return wallChange; }
+    static String wallpaperChangeReason() { return wallReason; }
 
     static void setOverlayListener(Listener l) {
         overlay = l;

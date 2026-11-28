@@ -64,6 +64,8 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
     private boolean capturing;
     private long lastCapture;
     private long lastDisturb;
+    /** Was zuletzt das Foto ungültig gemacht hat (für das Statusprotokoll). */
+    private String disturbReason = "-";
     private long frameTime;
     /** Wann das Effekt-Fenster zuletzt verschwand – kurz danach kein Foto, sonst wäre es noch darauf. */
     private long hiddenAt;
@@ -141,7 +143,7 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
         touchWatch = new View(this);
         touchWatch.setOnTouchListener((v, event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_OUTSIDE || event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                disturb();
+                disturb("Berührung");
             }
             return false;
         });
@@ -191,12 +193,12 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
                 CharSequence pkg = event.getPackageName();
                 if (pkg != null && !getPackageName().contentEquals(pkg)) frontPackage = pkg.toString();
                 homePackage = findHomePackage();
-                disturb();
+                disturb("Fenster " + pkg);
                 break;
             case AccessibilityEvent.TYPE_VIEW_SCROLLED:
             case AccessibilityEvent.TYPE_VIEW_CLICKED:
             case AccessibilityEvent.TYPE_VIEW_LONG_CLICKED:
-                disturb();
+                disturb("Ereignis " + event.getEventType() + " " + event.getPackageName());
                 break;
             default:
                 break;
@@ -204,8 +206,9 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
     }
 
     /** Etwas hat sich bewegt: Fenster sofort weg, altes Foto gilt nicht mehr. */
-    private void disturb() {
+    private void disturb(String reason) {
         lastDisturb = SystemClock.uptimeMillis();
+        disturbReason = reason;
         update();
     }
 
@@ -230,7 +233,10 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
         long now = SystemClock.uptimeMillis();
         // Seitenwechsel, Zoom oder Sichtbarkeit des Hintergrunds: Foto zeigt einen alten Stand
         long wallChange = TiltBus.wallpaperChange();
-        if (wallChange > lastDisturb) lastDisturb = wallChange;
+        if (wallChange > lastDisturb) {
+            lastDisturb = wallChange;
+            disturbReason = "Hintergrund " + TiltBus.wallpaperChangeReason();
+        }
         float soft = TiltBus.soft();
         boolean home = homeFront();
         boolean open = unlocked();
@@ -250,7 +256,8 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
     private void logStatus(boolean home, boolean open, float soft) {
         String status = "vorne=" + frontPackage + " home=" + homePackage + " startbildschirm=" + home
                 + " hintergrund=" + TiltBus.wallpaperVisible() + " zoom=" + Math.round(TiltBus.wallpaperZoom() * 100)
-                + " entsperrt=" + open + " foto=" + (frame != null) + " kippen=" + (soft >= PixelMode.SHOW_SOFT ? "ja" : "nein");
+                + " entsperrt=" + open + " foto=" + (frame != null) + " kippen=" + (soft >= PixelMode.SHOW_SOFT ? "ja" : "nein")
+                + " fotoAlt=" + (frameTime < lastDisturb) + " grund=" + disturbReason + " sichtbar=" + shown;
         if (!status.equals(lastStatus)) {
             lastStatus = status;
             Log.i("KippStatus", status);

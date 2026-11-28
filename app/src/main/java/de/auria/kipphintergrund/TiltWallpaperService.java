@@ -329,7 +329,7 @@ public final class TiltWallpaperService extends WallpaperService {
         /** Startbildschirm wischt zwischen Seiten. Das Bild bleibt stehen, nur Unschärfe und Abdunklung folgen. */
         @Override public void onOffsetsChanged(float xOffset, float yOffset, float xOffsetStep, float yOffsetStep,
                                                int xPixelOffset, int yPixelOffset) {
-            if (!isPreview()) TiltBus.wallpaperChanged(); // 0.45: Seitenwechsel – Foto des Pixel-Launchers veraltet
+            if (!isPreview()) TiltBus.wallpaperChanged("Seite " + xOffset); // 0.45: Seitenwechsel – Foto des Pixel-Launchers veraltet
             float swipe = enabled && pageBlur ? Effects.pageSwipe(xOffset, xOffsetStep) : 0f;
             if (Math.abs(swipe - pageSwipe) < .002f) return;
             pageSwipe = swipe;
