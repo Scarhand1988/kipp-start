@@ -449,8 +449,6 @@ final class LauncherMath {
     static final long SHEET_CLOSE_MS = 220;
     /** Unschärfe des Startbildschirms hinter dem offenen Fenster (dp). */
     static final float SHEET_BLUR_DP = 22f;
-    /** Befehl an den eigenen Hintergrund: Bild hinter dem Fenster unscharf (z = 0 … 100). */
-    static final String SHEET_COMMAND = "de.auria.kipphintergrund.SHEET_BLUR";
 
     /** Öffnungsgrad 0 … 1 → Stufe 0 … 100 für den Hintergrund (begrenzt). */
     static int sheetLevel(float progress) {

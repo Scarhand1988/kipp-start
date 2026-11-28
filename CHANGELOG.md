@@ -1,5 +1,15 @@
 # Änderungsverlauf
 
+## 0.44 – Kipp-Verlauf, Vorschau und Messwerte
+
+- Tap auf „Vorschau“ zeigt den Startbildschirm zum freien Kippen. Die Zurück-Taste oder „Zurück zu den Einstellungen“ öffnet das Einstellungsfenster wieder.
+- Die Menü-Unschärfe folgt dem Zustand des Launchers. Beim Sperren oder Verlassen des Startbildschirms wird sie zurückgesetzt. Mit Kipp-Start als Standard-Launcher pausieren die Sensoren außerhalb seines sichtbaren Startbildschirms.
+- Die Abdunklung folgt beim Startbildschirm v2 gemeinsam mit der Unschärfe der Kipprichtung. Diagonale Verläufe berücksichtigen das Displayformat. Die Uhr bleibt an der scharfen Seite etwas besser lesbar.
+- Die lokale Suche über dem Dock hat eine größere Tippfläche bei einer flacheren sichtbaren Form.
+- Die Messanzeige trennt verspätete Frames von fehlenden Messberichten. Beim Hintergrund zeigt sie gezeichnete Bilder und das Alter des letzten Sensorwerts.
+
+Prüfablauf auf dem Pixel 7: Startbildschirm gerade sowie leicht und stark nach links und rechts kippen. Bei offener Menü-Unschärfe sperren und wieder entsperren. Anschließend in die Vorschau wechseln, kippen und über beide Zurück-Wege schließen. Für die Bildzeiten Launcher und Hintergrund während einer gleichmäßigen Bewegung im System-Trace prüfen.
+
 ## 0.43 – Nachbesserungen nach unabhängiger Prüfung
 
 0.38 bis 0.42 von einem zweiten Prüfer durchgesehen, der den Bau nicht mitverfolgt hat. Kein Absturz gefunden; diese Punkte sind behoben:

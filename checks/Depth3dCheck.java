@@ -80,6 +80,23 @@ public final class Depth3dCheck {
             }
         }
         require(Depth3d.blurX(.5f, true) == -.5f && Depth3d.blurY(.5f, false) == .5f, "Umkehren dreht beides");
+        float[] vector = new float[2];
+        for (float dx : new float[] {-1f, 0f, .6f, 1f}) {
+            for (float dy : new float[] {-.8f, 0f, .8f}) {
+                float norm = (float) Math.hypot(dx, dy);
+                if (norm == 0f) continue;
+                float nx = dx / norm, ny = dy / norm;
+                Depth3d.rampVector(nx, ny, 1080f, 2400f, vector);
+                float lengthSquared = vector[0] * vector[0] + vector[1] * vector[1];
+                for (float u : new float[] {-.75f, -.25f, .25f, .75f}) {
+                    for (float v : new float[] {-.5f, 0f, .5f}) {
+                        float pixelProjection = (u * 540f * vector[0] + v * 1200f * vector[1]) / lengthSquared;
+                        require(Math.abs(pixelProjection - (u * nx + v * ny)) < 1e-5f,
+                                "Diagonaler Verlauf deckt sich auf dem Pixelformat mit dem Symbolraster");
+                    }
+                }
+            }
+        }
         System.out.println(passed + " Prüfungen (Depth3d) bestanden");
     }
 }

@@ -125,6 +125,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     /** 0.30: je Symbol/Widget der zuletzt gesetzte Effekt {blur, dim}. */
     private final java.util.WeakHashMap<View, int[]> depthState = new java.util.WeakHashMap<>();
     private final ArrayList<View> depthTouched = new ArrayList<>();
+    private TextView searchPill;
     private final int[] depthOrigin = new int[2];
     private final int[] depthAt = new int[2];
     private int appliedDim;
@@ -267,21 +268,20 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         bottomBar.addView(dots, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(14)));
 
         // „Suche“ über dem Dock wie im Video
-        TextView searchPill = new TextView(this);
+        searchPill = new TextView(this);
         searchPill.setText("Suche");
         searchPill.setTextColor(0xE6FFFFFF);
         searchPill.setTextSize(13);
         searchPill.setGravity(Gravity.CENTER);
         GradientDrawable pill = new GradientDrawable();
-        pill.setColor(0x40000000);
+        pill.setColor(0x553C3936);
         pill.setCornerRadius(dp(15));
-        searchPill.setBackground(pill);
+        searchPill.setBackground(new android.graphics.drawable.InsetDrawable(pill, 0, dp(10), 0, dp(10)));
         searchPill.setPadding(dp(22), 0, dp(22), 0);
         searchPill.setOnClickListener(v -> openDrawer(true));
-        LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(30));
+        LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         pillParams.gravity = Gravity.CENTER_HORIZONTAL;
-        pillParams.topMargin = dp(2);
-        pillParams.bottomMargin = dp(12);
+        pillParams.topMargin = -dp(2);
         bottomBar.addView(searchPill, pillParams);
 
         dock = new LinearLayout(this);
@@ -1893,7 +1893,6 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     }
 
     private int sheetBackBlur;
-    private int sheetWallpaperLevel;
 
     /** 0.40: Fenster offen → Startbildschirm und Hintergrundbild dahinter verschwimmen im selben Maß. */
     @Override public void onSheetProgress(float progress) {
@@ -1904,16 +1903,8 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
             workspace.setRenderEffect(effect);
             bottomBar.setRenderEffect(effect);
         }
-        int level = LauncherMath.sheetLevel(progress);
-        if (level == sheetWallpaperLevel) return;
-        android.os.IBinder token = getWindow() == null ? null : getWindow().getDecorView().getWindowToken();
-        if (token == null) return; // nicht als gesendet merken – beim nächsten Mal erneut versuchen
-        try {
-            android.app.WallpaperManager.getInstance(this).sendWallpaperCommand(token, LauncherMath.SHEET_COMMAND, 0, 0, level, null);
-            sheetWallpaperLevel = level;
-        } catch (RuntimeException ignored) {
-            // Anderer Hintergrund aktiv: dann bleibt nur der Startbildschirm unscharf
-        }
+        if (sheet.isPreviewing()) clearSheetDepth();
+        TiltBus.setSheetLevel(this, LauncherMath.sheetLevel(progress));
     }
 
     @Override public void onExpandNotifications() {
@@ -2228,6 +2219,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         if (dock != null) {
             for (int i = 0; i < dock.getChildCount(); i++) depthView(dock.getChildAt(i), blurTarget, dimTarget, soft, dx, dy, width, height);
         }
+        depthView(searchPill, blurTarget, dimTarget, soft, dx, dy, width, height);
         applySheetDepth(blurTarget, dx, dy);
         // Symbole anderer Seiten (nach dem Blättern) wieder auf normal setzen
         java.util.Iterator<java.util.Map.Entry<View, int[]>> it = depthState.entrySet().iterator();
@@ -2245,6 +2237,12 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         float u = LauncherMath.depthCoord(depthAt[0] - depthOrigin[0] + view.getWidth() / 2f, width);
         float v = LauncherMath.depthCoord(depthAt[1] - depthOrigin[1] + view.getHeight() / 2f, height);
         float amount = LauncherMath.depthAmount(u, v, dx, dy);
+        if (view instanceof ClockView) {
+            float sharpSide = LauncherMath.depthAmount(
+                    u + Math.signum(dx) * view.getWidth() / (3f * width),
+                    v + Math.signum(dy) * view.getHeight() / (3f * height), dx, dy);
+            amount = (amount + sharpSide) / 2f;
+        }
         int[] state = depthState.get(view);
         boolean fresh = state == null;
         if (fresh) {
@@ -2277,9 +2275,11 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     private float sheetDx;
     private float sheetDy;
     private final float[] sheetRamp = new float[3];
+    private final float[] sheetRampVector = new float[2];
 
     private void applySheetDepth(int blurTarget, float dx, float dy) {
-        if (sheet == null || !sheet.isOpen() || blurTarget <= 0 || sheet.getWidth() <= 0) {
+        if (sheet == null || !sheet.isOpen() || sheet.isPreviewing() || blurTarget <= 0
+                || sheet.getWidth() <= 0 || sheet.getHeight() <= 0) {
             clearSheetDepth();
             return;
         }
@@ -2296,12 +2296,12 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         float bx = -dx / m, by = -dy / m;
         Depth3d.ramp(m, sheetRamp);
         float w = sheet.getWidth(), h = sheet.getHeight();
-        float reach = Math.abs(bx) * w / 2f + Math.abs(by) * h / 2f;
+        Depth3d.rampVector(bx, by, w, h, sheetRampVector);
         float cx = w / 2f, cy = h / 2f;
         int keep = Math.round(255f * (1f - sheetRamp[2]));
         android.graphics.LinearGradient mask = new android.graphics.LinearGradient(
-                cx + bx * sheetRamp[0] * reach, cy + by * sheetRamp[0] * reach,
-                cx + bx * sheetRamp[1] * reach, cy + by * sheetRamp[1] * reach,
+                cx + sheetRampVector[0] * sheetRamp[0], cy + sheetRampVector[1] * sheetRamp[0],
+                cx + sheetRampVector[0] * sheetRamp[1], cy + sheetRampVector[1] * sheetRamp[1],
                 keep << 24, 0, android.graphics.Shader.TileMode.CLAMP);
         // scharfe Fassung nur dort, wo die Maske deckt; darunter die weiche
         android.graphics.RenderEffect sharp = android.graphics.RenderEffect.createBlendModeEffect(
@@ -2354,6 +2354,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
     @Override protected void onStart() {
         super.onStart();
         started = true;
+        TiltBus.setHomeVisible(this, true);
         if (wallpaperPrefs == null) {
             wallpaperPrefs = PhotoStore.preferences(this);
             wallpaperPrefs.registerOnSharedPreferenceChangeListener(measureListener);
@@ -2383,6 +2384,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override protected void onStop() {
         // 0.43: Startbildschirm verlassen oder Bildschirm aus – Fenster zu, Startbildschirm und Hintergrund wieder scharf
+        TiltBus.setHomeVisible(this, false);
         if (sheet != null) sheet.closeNow();
         super.onStop();
         started = false;
@@ -2415,7 +2417,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
 
     @Override public void onBackPressed() {
         // Der Startbildschirm schließt sich nie; Zurück schließt nur Übersicht und Einstellungen
-        if (closeAppMenu() || closeResize() || closeFolder()) return;
+        if (sheet.exitPreview() || closeAppMenu() || closeResize() || closeFolder()) return;
         if (root.isDragging()) root.cancel();
         else if (sheet.isOpen()) sheet.close();
         else if (drawer.isOpen()) drawer.close(true);
@@ -2427,6 +2429,7 @@ public final class LauncherActivity extends Activity implements Workspace.Callba
         if (meter != null) meter.stop();
         main.removeCallbacks(undoExpired);
         undoExpired.run(); // offene Widget-Löschungen abschließen
+        TiltBus.setHomeVisible(this, false);
         TiltBus.clearListener(this);
         try {
             launcherApps.unregisterCallback(appsCallback);

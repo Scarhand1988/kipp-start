@@ -58,6 +58,19 @@ final class Depth3d {
         out[2] = 1f - k + k * floor;
     }
 
+    /**
+     * Ein Schritt der auf die Bildschirmachsen normierten Projektion, in Pixeln.
+     * Die Richtung in Pixeln berücksichtigt das Seitenverhältnis, damit ein diagonaler
+     * Verlauf am Mittelpunkt eines Symbols denselben Wert wie dessen Tiefenberechnung hat.
+     */
+    static void rampVector(float dirX, float dirY, float width, float height, float[] out) {
+        float x = 2f * dirX / width;
+        float y = 2f * dirY / height;
+        float squared = x * x + y * y;
+        out[0] = x / squared;
+        out[1] = y / squared;
+    }
+
     /** Unschärfe-Anteil 0 … 1 an der Lage q für einen Verlauf aus ramp(). */
     static float rampAmount(float q, float[] r) {
         float t = r[1] > r[0] ? clamp((q - r[0]) / (r[1] - r[0]), 0f, 1f) : 1f;

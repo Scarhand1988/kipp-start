@@ -7,7 +7,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
@@ -113,6 +112,8 @@ final class SettingsSheet extends FrameLayout {
     private ValueAnimator progressAnimator;
     private float progress;
     private boolean open;
+    private boolean previewing;
+    private final TextView previewExit;
 
     SettingsSheet(Context context, SharedPreferences prefs, Callbacks callbacks) {
         super(context);
@@ -122,7 +123,7 @@ final class SettingsSheet extends FrameLayout {
         density = context.getResources().getDisplayMetrics().density;
         setBackgroundColor(0x40000000);
         setVisibility(GONE);
-        setOnClickListener(v -> close());
+        setOnClickListener(v -> { if (!previewing) close(); });
 
         // Oben über dem unscharfen Startbildschirm: „Abbrechen“ links, „Fertig“ rechts (wie im Video)
         topBar = new LinearLayout(context);
@@ -159,6 +160,12 @@ final class SettingsSheet extends FrameLayout {
         holder.addView(card, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         scroll.addView(holder, new ScrollView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
+        previewExit = pill("Zurück zu den Einstellungen", false);
+        previewExit.setVisibility(GONE);
+        previewExit.setOnClickListener(v -> exitPreview());
+        LayoutParams exitParams = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(48), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        addView(previewExit, exitParams);
+
         mainPage = page();
         transitionsPage = page();
         morePage = page();
@@ -187,20 +194,7 @@ final class SettingsSheet extends FrameLayout {
         switchRow(group, "Kippen", null, TILT);
 
         LinearLayout preview = group(p);
-        TextView peek = linkRow(preview, "Vorschau (gedrückt halten)", null);
-        peek.setOnTouchListener((v, e) -> {
-            switch (e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    peek(true);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    peek(false);
-                    return true;
-                default:
-                    return true;
-            }
-        });
+        linkRow(preview, "Vorschau", () -> showPreview(true));
 
         LinearLayout tools = group(p);
         linkRow(tools, "Alle Symbole neu erzeugen", () -> closeThen(callbacks::onReloadIcons));
@@ -518,6 +512,7 @@ final class SettingsSheet extends FrameLayout {
         for (Runnable r : refreshers.values()) r.run();
         setVisibility(VISIBLE);
         setAlpha(1f);
+        scroll.setVisibility(VISIBLE);
         scroll.setAlpha(1f);
         topBar.setVisibility(VISIBLE);
         setBackgroundColor(0x40000000);
@@ -532,6 +527,8 @@ final class SettingsSheet extends FrameLayout {
     void close() {
         if (!open) return;
         open = false;
+        previewing = false;
+        previewExit.setVisibility(GONE);
         before.clear();
         topBar.animate().alpha(0f).setDuration(LauncherMath.SHEET_CLOSE_MS).start();
         float away = scroll.getHeight() > 0 ? scroll.getHeight() : 700 * density;
@@ -543,6 +540,8 @@ final class SettingsSheet extends FrameLayout {
     void closeNow() {
         if (!open && getVisibility() == GONE && progress == 0f) return;
         open = false;
+        previewing = false;
+        previewExit.setVisibility(GONE);
         before.clear();
         if (progressAnimator != null) progressAnimator.cancel();
         topBar.animate().cancel();
@@ -558,17 +557,28 @@ final class SettingsSheet extends FrameLayout {
         run.run();
     }
 
-    /** Vorschau: solange der Finger liegt, verschwindet das Fenster und der Startbildschirm ist scharf zu sehen. */
-    private void peek(boolean down) {
-        if (!open) return; // Fenster wurde inzwischen geschlossen (z. B. Home-Taste): nichts wieder einblenden
-        float a = down ? 0f : 1f;
-        scroll.animate().alpha(a).setDuration(150).start();
-        // Während der Vorschau sind „Abbrechen“ und „Fertig“ weg und nicht antippbar
+    boolean isPreviewing() { return previewing; }
+
+    boolean exitPreview() {
+        if (!previewing) return false;
+        showPreview(false);
+        return true;
+    }
+
+    private void showPreview(boolean show) {
+        if (!open || previewing == show) return;
+        previewing = show;
+        scroll.animate().cancel();
+        scroll.setTranslationY(0f);
+        scroll.setVisibility(show ? INVISIBLE : VISIBLE);
         topBar.animate().cancel();
         topBar.setAlpha(1f);
-        topBar.setVisibility(down ? INVISIBLE : VISIBLE);
-        setBackgroundColor(down ? 0 : 0x40000000);
-        animateProgress(down ? 0f : 1f, 150, null);
+        topBar.setVisibility(show ? INVISIBLE : VISIBLE);
+        previewExit.setVisibility(show ? VISIBLE : GONE);
+        if (show) previewExit.requestFocus();
+        setBackgroundColor(show ? 0 : 0x40000000);
+        callbacks.onSheetProgress(progress);
+        animateProgress(show ? 0f : 1f, 150, null);
     }
 
     private void animateProgress(float target, long duration, Runnable end) {

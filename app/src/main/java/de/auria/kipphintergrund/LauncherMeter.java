@@ -25,6 +25,7 @@ final class LauncherMeter implements Window.OnFrameMetricsAvailableListener {
     // nur im Mess-Thread
     private long windowStart;
     private int frames;
+    private int missingReports;
     private int janky;
     private long totalNanos;
 
@@ -71,13 +72,14 @@ final class LauncherMeter implements Window.OnFrameMetricsAvailableListener {
         frames++;
         totalNanos += total;
         if (LauncherMath.janky(total, deadline)) janky++;
-        janky += dropped; // vom System verworfene Messungen zählen als verpasst
+        missingReports += dropped;
         long span = now - windowStart;
         if (span >= 1_000_000_000L) {
-            String text = String.format(Locale.GERMANY, "Start: %d B/s · %d ruckelig · Ø %.1f ms",
-                    Math.round(frames * 1e9 / span), janky, frames == 0 ? 0f : totalNanos / 1e6f / frames);
+            String text = String.format(Locale.GERMANY, "Start: %d B/s · %d spät · %d ohne Messung · Ø %.1f ms",
+                    Math.round(frames * 1e9 / span), janky, missingReports, frames == 0 ? 0f : totalNanos / 1e6f / frames);
             frames = 0;
             janky = 0;
+            missingReports = 0;
             totalNanos = 0;
             windowStart = now;
             main.post(() -> view.setText(text));

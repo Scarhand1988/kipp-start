@@ -2,6 +2,7 @@ package de.auria.kipphintergrund;
 
 import android.app.KeyguardManager;
 import android.app.WallpaperColors;
+import android.app.role.RoleManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -27,6 +28,7 @@ import android.hardware.SensorManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.view.Choreographer;
@@ -60,6 +62,10 @@ public final class TiltWallpaperService extends WallpaperService {
         private final Object drawLock = new Object();
         private final Choreographer.FrameCallback renderFrame = this::onFrame;
         private final Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private final Paint shadePaint = new Paint();
+        private final LinearGradient shadeMask = new LinearGradient(0, 0, 1, 0,
+                0x001B1A1A, 0xff1B1A1A, Shader.TileMode.CLAMP);
+        private final float[] rampVector = new float[2];
         private final Paint gradientPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
         private final Matrix softMatrix = new Matrix();
         private final Matrix maskMatrix = new Matrix();
@@ -102,11 +108,19 @@ public final class TiltWallpaperService extends WallpaperService {
         private volatile boolean parallax;
         // 0.37: „3D-Effekt umkehren“ gilt auch für das Bild (Einstellung liegt beim Startbildschirm)
         private volatile boolean flip;
+        private volatile boolean directionalDepth;
+        private volatile boolean tiltAllowed;
+        private boolean screenOn;
+        private boolean ownDefaultHome;
+        private final Runnable homeObserver = this::syncHome;
         private SharedPreferences launcherPrefs;
         private final float[] ramp = new float[3];
         private final SharedPreferences.OnSharedPreferenceChangeListener flipListener = (prefs, key) -> {
             if (SettingsSheet.DEPTH_FLIP.equals(key)) {
                 flip = prefs.getBoolean(key, false);
+                scheduleFrame();
+            } else if (SettingsSheet.HOME_V2.equals(key) || SettingsSheet.DEPTH.equals(key)) {
+                readDepthOptions();
                 scheduleFrame();
             }
         };
@@ -156,8 +170,17 @@ public final class TiltWallpaperService extends WallpaperService {
                     armed = true;
                     presentAt = 0;
                     baseResetPending = true;
+                    screenOn = false;
+                    unlocking = false;
+                    unlockAmount = 0f;
+                    TiltBus.resetSheetLevel();
+                    syncHome();
+                } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
+                    screenOn = true;
+                    syncHome();
                 } else if (Intent.ACTION_USER_PRESENT.equals(action)) {
                     presentAt = SystemClock.uptimeMillis();
+                    syncHome();
                     // Die Haltung beim Entsperren ist die Ausgangslage für „Unschärfe bleibt“
                     heldTarget = 0;
                     sensorHandler.post(tracker::resetBase);
@@ -194,6 +217,7 @@ public final class TiltWallpaperService extends WallpaperService {
             launcherPrefs = getSharedPreferences("launcher", Context.MODE_PRIVATE);
             launcherPrefs.registerOnSharedPreferenceChangeListener(flipListener);
             flip = launcherPrefs.getBoolean(SettingsSheet.DEPTH_FLIP, false);
+            readDepthOptions();
             sensors = getSystemService(SensorManager.class);
             sensor = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
             if (sensor == null) sensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
@@ -220,11 +244,16 @@ public final class TiltWallpaperService extends WallpaperService {
             systemMaxScale = PhotoStore.systemWallpaperScale();
             maxRefreshRate = readMaxRefreshRate();
             keyguard = getSystemService(KeyguardManager.class);
+            PowerManager power = getSystemService(PowerManager.class);
+            screenOn = power != null && power.isInteractive();
+            shadePaint.setShader(shadeMask);
             if (!isPreview()) {
+                TiltBus.addHomeObserver(homeObserver);
                 TiltBus.setNeutralHandler(neutral);
                 IntentFilter filter = new IntentFilter();
                 filter.addAction(Intent.ACTION_SCREEN_OFF);
                 filter.addAction(Intent.ACTION_USER_PRESENT);
+                filter.addAction(Intent.ACTION_SCREEN_ON);
                 try {
                     registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED);
                     receiverRegistered = true;
@@ -253,7 +282,9 @@ public final class TiltWallpaperService extends WallpaperService {
         @Override public void onVisibilityChanged(boolean showing) {
             if (visible == showing) return;
             visible = showing;
-            syncSensor();
+            RoleManager roles = getSystemService(RoleManager.class);
+            ownDefaultHome = roles != null && roles.isRoleHeld(RoleManager.ROLE_HOME);
+            syncHome();
             if (showing) {
                 // Nach dem Entsperren direkt auf dem Startbildschirm: Animation abspielen.
                 // Wer erst in eine App entsperrt und später zum Startbildschirm wechselt, bekommt keine verspätete Animation.
@@ -293,16 +324,6 @@ public final class TiltWallpaperService extends WallpaperService {
             scheduleFrame(); // höchstens einmal pro Bildtakt zeichnen, auch wenn das System öfter meldet
         }
 
-        /** 0.40: Befehl vom eigenen Startbildschirm – Einstellungs-Fenster öffnet oder schließt. */
-        @Override public android.os.Bundle onCommand(String action, int x, int y, int z, android.os.Bundle extras,
-                                                     boolean resultRequested) {
-            if (LauncherMath.SHEET_COMMAND.equals(action)) {
-                sheetSoft = Math.max(0f, Math.min(1f, z / 100f));
-                scheduleFrame();
-            }
-            return null;
-        }
-
         /** Startbildschirm wischt zwischen Seiten. Das Bild bleibt stehen, nur Unschärfe und Abdunklung folgen. */
         @Override public void onOffsetsChanged(float xOffset, float yOffset, float xOffsetStep, float yOffsetStep,
                                                int xPixelOffset, int yPixelOffset) {
@@ -316,6 +337,7 @@ public final class TiltWallpaperService extends WallpaperService {
             destroyed = true;
             visible = false;
             if (!isPreview()) TiltBus.publish(0f, 0f, 0f);
+            TiltBus.removeHomeObserver(homeObserver);
             TiltBus.clearNeutralHandler(neutral);
             syncSensor();
             stopFrames();
@@ -339,8 +361,21 @@ public final class TiltWallpaperService extends WallpaperService {
             super.onDestroy();
         }
 
+        private void syncHome() {
+            boolean unlocked = screenOn && (keyguard == null || !keyguard.isKeyguardLocked());
+            tiltAllowed = unlocked && (TiltBus.homeVisible() || !ownDefaultHome);
+            sheetSoft = visible && unlocked ? TiltBus.sheetLevel() / 100f : 0f;
+            syncSensor();
+            scheduleFrame();
+        }
+
+        private void readDepthOptions() {
+            directionalDepth = launcherPrefs.getBoolean(SettingsSheet.HOME_V2, true)
+                    && launcherPrefs.getBoolean(SettingsSheet.DEPTH, true);
+        }
+
         private void syncSensor() {
-            boolean shouldListen = enabled && visible && surfaceReady && photo != null && sensor != null && !destroyed;
+            boolean shouldListen = (isPreview() || tiltAllowed) && enabled && visible && surfaceReady && photo != null && sensor != null && !destroyed;
             if (shouldListen == listening) return;
             if (shouldListen) {
                 // Nur das Ziel zurücksetzen, nicht die Position: das Bild gleitet weich zurück statt zu springen
@@ -363,6 +398,8 @@ public final class TiltWallpaperService extends WallpaperService {
                     sensors.unregisterListener(this);
                     listening = false;
                 }
+                targetX = targetY = heldTarget = 0f;
+                sensorNanos = 0L;
             }
         }
 
@@ -386,7 +423,7 @@ public final class TiltWallpaperService extends WallpaperService {
 
         /** Die weiche Version wird gebraucht, wenn irgendein Effekt weichzeichnet. */
         private boolean softNeeded() {
-            return blurStrength > 0 || unlockAnimation || zoomBlur || pageBlur;
+            return !isPreview() || blurStrength > 0 || unlockAnimation || zoomBlur || pageBlur;
         }
 
         private void startUnlock() {
@@ -686,8 +723,8 @@ public final class TiltWallpaperService extends WallpaperService {
             }
             boolean moving = x != tx || y != ty || held != th || unlocking;
             setHighFrameRate(moving);
-            draw();
-            if (measure && moving) {
+            boolean submitted = draw();
+            if (measure && moving && submitted) {
                 // Alter des Sensorwerts beim Zeichnen (gleiche Zeitbasis wie SensorEvent.timestamp)
                 long sample = sensorNanos;
                 meter.frame(now, sample == 0 ? 0 : SystemClock.elapsedRealtimeNanos() - sample);
@@ -709,27 +746,28 @@ public final class TiltWallpaperService extends WallpaperService {
             }
         }
 
-        private void draw() {
+        private boolean draw() {
             synchronized (drawLock) {
-                drawLocked();
+                return drawLocked();
             }
         }
 
-        private void drawLocked() {
-            if (!surfaceReady) return;
+        private boolean drawLocked() {
+            if (!surfaceReady) return false;
             SurfaceHolder holder = getSurfaceHolder();
             Canvas canvas;
             try {
                 canvas = holder.lockHardwareCanvas();
             } catch (IllegalStateException | IllegalArgumentException e) {
-                return; // The surface can disappear between lifecycle callbacks.
+                return false; // The surface can disappear between lifecycle callbacks.
             }
-            if (canvas == null) return;
+            if (canvas == null) return false;
             try {
                 canvas.drawColor(0xff101418);
-                if (photo == null) return;
-                float px = x;
-                float py = y;
+                if (photo == null) return false;
+                boolean tiltVisible = enabled && (isPreview() || tiltAllowed);
+                float px = tiltVisible ? x : 0f;
+                float py = tiltVisible ? y : 0f;
                 int width = canvas.getWidth();
                 int height = canvas.getHeight();
                 MotionMath.cover(width, height, photo.getWidth(), photo.getHeight(),
@@ -739,8 +777,9 @@ public final class TiltWallpaperService extends WallpaperService {
 
                 // Mit „Unschärfe bleibt“ zählt auch die Neigung gegenüber dem Entsperren (ohne Nachführen)
                 float tiltMove = Math.max(Math.abs(px), Math.abs(py));
-                boolean heldWins = held > tiltMove;
-                float movement = Math.min(1f, Math.max(tiltMove, held));
+                float heldVisible = tiltVisible ? held : 0f;
+                boolean heldWins = heldVisible > tiltMove;
+                float movement = Math.min(1f, Math.max(tiltMove, heldVisible));
                 float unlock = enabled && unlocking ? unlockAmount : 0f;
                 float zoomed = enabled && zoomBlur ? Math.max(0f, Math.min(1f, zoomOut)) : 0f;
                 if (enabled) zoomed = Math.max(zoomed, sheetSoft);
@@ -750,8 +789,8 @@ public final class TiltWallpaperService extends WallpaperService {
                 float evenSoft = Effects.softAlpha(0f, unlock, zoomed, page);
                 // Farben verblassen: der Hintergrund tritt dunkel und farblos zurück, die Symbole heben sich ab.
                 // Als Farbfilter direkt auf dem Bild statt als eigene Vollbild-Ebene: ein Zeichendurchgang weniger.
-                float dark = Effects.dim(enabled && frost ? Effects.frostDim(movement) : 0f, unlock, zoomed, page);
-                LightingColorFilter dimFilter = dimFilter(DrawMath.dimLevel(dark));
+                float tiltDark = frost ? Effects.frostDim(movement) : 0f;
+                float dark = Effects.dim(tiltDark, unlock, zoomed, page);
                 float dirX = heldWins ? heldDirX : px;
                 float dirY = heldWins ? heldDirY : py;
                 float blurX = Depth3d.blurX(dirX, flip);
@@ -762,9 +801,21 @@ public final class TiltWallpaperService extends WallpaperService {
                     TiltBus.publish(tiltSoft, enabled && frost ? Effects.frostDim(movement) : 0f, unlock,
                             enabled ? dirX : 0f, enabled ? dirY : 0f);
                 }
-                paint.setColorFilter(dimFilter);
-                gradientPaint.setColorFilter(dimFilter);
                 Effects.blurSide(blurX, blurY, blurDir);
+                boolean home = !isPreview() && TiltBus.homeVisible();
+                boolean directional = (!home || directionalDepth) && (blurDir[0] != 0 || blurDir[1] != 0);
+                boolean shadeSlope = home && directional;
+                float magnitude = (float) Math.hypot(blurX, blurY);
+                float baseDark = shadeSlope
+                        ? Effects.dim(tiltDark * LauncherMath.depthShade(0f, magnitude), unlock, zoomed, page)
+                        : dark;
+                LightingColorFilter filter = dimFilter(DrawMath.dimLevel(baseDark));
+                paint.setColorFilter(filter);
+                gradientPaint.setColorFilter(filter);
+                if (directional) {
+                    Depth3d.ramp(magnitude, ramp);
+                    updateRampMatrix(width, height);
+                }
 
                 canvas.save();
                 if (unlock > 0) {
@@ -776,12 +827,11 @@ public final class TiltWallpaperService extends WallpaperService {
                 paint.setAlpha(255);
                 canvas.drawBitmap(photo, null, destination, paint);
                 if (softPhoto != null) {
-                    boolean slope = tiltSoft > evenSoft && (blurDir[0] != 0 || blurDir[1] != 0);
+                    boolean slope = tiltSoft > evenSoft && directional;
                     if (slope) {
                         // Die Seite, die zum Betrachter kommt, voll weich; die Seite, die nach hinten geht, nur zum Teil
                         // 0.37: gleicher Verlauf wie bei den Symbolen – die weggekippte Seite bleibt scharf
-                        Depth3d.ramp((float) Math.hypot(blurX, blurY), ramp);
-                        drawSoftSlope(canvas, width, height, Math.max(evenSoft, tiltSoft * ramp[2]), tiltSoft);
+                        drawSoftSlope(canvas, Math.max(evenSoft, tiltSoft * ramp[2]), tiltSoft);
                     } else {
                         float alpha = Math.min(1f, Math.max(evenSoft, tiltSoft));
                         if (alpha > 0) {
@@ -797,12 +847,18 @@ public final class TiltWallpaperService extends WallpaperService {
                     drawSubject(canvas, subject, subjectDark, Depth3d.subjectAlpha(tiltSoft, evenSoft, subject3d),
                             parallax ? px : 0f, parallax ? py : 0f, width, height);
                 }
+                if (shadeSlope && dark > baseDark) {
+                    shadeMask.setLocalMatrix(maskMatrix);
+                    shadePaint.setAlpha(Math.round(255 * DrawMath.secondLayer(baseDark, dark)));
+                    canvas.drawRect(destination, shadePaint);
+                }
                 canvas.restore();
                 if (measure) drawMeter(canvas, width, height);
             } finally {
                 holder.unlockCanvasAndPost(canvas);
                 recycleRetired();
             }
+            return true;
         }
 
         /** Motiv über den Hintergrund legen; gerade gehalten deckt es sich genau mit dem Foto. */
@@ -843,7 +899,7 @@ public final class TiltWallpaperService extends WallpaperService {
         /** Messanzeige oben links: Bilder pro Sekunde beim Kippen und Alter des Sensorwerts beim Zeichnen. */
         private void drawMeter(Canvas canvas, int width, int height) {
             String line = meter.hasValue()
-                    ? String.format(Locale.GERMANY, "%.0f Bilder/s · Sensor→Bild %.1f ms", meter.fps(), meter.latencyMs())
+                    ? String.format(Locale.GERMANY, "Hintergrund: %.0f B/s · Sensoralter %.1f ms", meter.fps(), meter.latencyMs())
                     : "Messung: Handy kippen …";
             float size = Math.min(width, height) * .036f;
             meterText.setTextSize(size);
@@ -855,12 +911,21 @@ public final class TiltWallpaperService extends WallpaperService {
             canvas.drawText(line, left + pad, top + pad + size * .82f, meterText);
         }
 
+        private void updateRampMatrix(int width, int height) {
+            Depth3d.rampVector(blurDir[0], blurDir[1], width, height, rampVector);
+            float vx = rampVector[0], vy = rampVector[1];
+            float length = Math.max(1f, (ramp[1] - ramp[0]) * (float) Math.hypot(vx, vy));
+            maskMatrix.setScale(length, length);
+            maskMatrix.postRotate((float) Math.toDegrees(Math.atan2(vy, vx)));
+            maskMatrix.postTranslate(width / 2f + vx * ramp[0], height / 2f + vy * ramp[0]);
+        }
+
         /**
          * Weiche Version mit Verlauf: Seite gegenüber blurDir mit lowAlpha, Seite in Richtung blurDir mit highAlpha.
          * Zwei Schichten mit festem Verlauf, damit beim Kippen pro Bild keine neuen Objekte entstehen:
          * Schicht 1 überall lowAlpha, Schicht 2 mit Verlauf 0 → DrawMath.secondLayer (zusammen genau highAlpha).
          */
-        private void drawSoftSlope(Canvas canvas, int width, int height, float lowAlpha, float highAlpha) {
+        private void drawSoftSlope(Canvas canvas, float lowAlpha, float highAlpha) {
             float low = Math.min(1f, lowAlpha);
             if (low > 0) {
                 paint.setAlpha(Math.round(255 * low));
@@ -880,14 +945,6 @@ public final class TiltWallpaperService extends WallpaperService {
             softSource.set(0, 0, softPhoto.getWidth(), softPhoto.getHeight());
             softMatrix.setRectToRect(softSource, destination, Matrix.ScaleToFit.FILL);
             softShader.setLocalMatrix(softMatrix);
-            // Verlauf von der hinteren zur vorderen Seite legen: Länge, Richtung, Startpunkt
-            float cx = width / 2f, cy = height / 2f;
-            float reach = Math.max(1f, Math.abs(blurDir[0]) * width / 2f + Math.abs(blurDir[1]) * height / 2f);
-            // 0.37: Übergang dort, wo auch die Symbole von scharf nach unscharf wechseln (ramp)
-            float length = Math.max(1f, (ramp[1] - ramp[0]) * reach);
-            maskMatrix.setScale(length, length);
-            maskMatrix.postRotate((float) Math.toDegrees(Math.atan2(blurDir[1], blurDir[0])));
-            maskMatrix.postTranslate(cx + blurDir[0] * ramp[0] * reach, cy + blurDir[1] * ramp[0] * reach);
             slopeMask.setLocalMatrix(maskMatrix);
             gradientPaint.setAlpha(Math.round(255 * second));
             canvas.drawRect(destination, gradientPaint);

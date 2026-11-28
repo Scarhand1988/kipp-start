@@ -57,6 +57,40 @@ final class TiltBus {
         }
     }
 
+    // Launcher und aktiver Live-Hintergrund teilen sich den Hauptthread.
+    private static volatile Listener visibleHome;
+    private static int sheetLevel;
+    private static final java.util.ArrayList<Runnable> homeObservers = new java.util.ArrayList<>();
+
+    static void setHomeVisible(Listener home, boolean visible) {
+        if (visible == (visibleHome == home)) return;
+        visibleHome = visible ? home : null;
+        sheetLevel = 0;
+        notifyHomeObservers();
+    }
+
+    static boolean homeVisible() { return visibleHome != null; }
+    static int sheetLevel() { return sheetLevel; }
+
+    static void setSheetLevel(Listener home, int level) {
+        if (visibleHome != home || sheetLevel == level) return;
+        sheetLevel = level;
+        notifyHomeObservers();
+    }
+
+    static void resetSheetLevel() {
+        if (sheetLevel == 0) return;
+        sheetLevel = 0;
+        notifyHomeObservers();
+    }
+
+    private static void notifyHomeObservers() {
+        for (Runnable observer : homeObservers) observer.run();
+    }
+
+    static void addHomeObserver(Runnable observer) { homeObservers.add(observer); }
+    static void removeHomeObserver(Runnable observer) { homeObservers.remove(observer); }
+
     private static Runnable neutral;
 
     /** 0.17: Der Hintergrund meldet hier, wie er die jetzige Haltung als „gerade“ übernimmt. */
