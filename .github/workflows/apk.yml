@@ -116,7 +116,9 @@ jobs:
           name: Kipp-Start-apk
           path: Kipp-Start.apk
 
+      # Test-Bau von einem anderen Branch: nur als Download unter Actions (Kipp-Start-apk), kein öffentliches Release
       - name: Als Release veröffentlichen
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.KIPP_VERSION }}.${{ github.run_number }}
