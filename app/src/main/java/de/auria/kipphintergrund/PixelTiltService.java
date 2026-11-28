@@ -176,7 +176,8 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
                 CharSequence pkg = root.getPackageName();
-                if (pkg != null) frontPackage = pkg.toString();
+                // Eigene Fenster (Berührungsmelder) zählen nicht: Android meldet sie nach einer Berührung als aktiv
+                if (pkg != null && !getPackageName().contentEquals(pkg)) frontPackage = pkg.toString();
             }
         } catch (RuntimeException ignored) {
             // Fenster wechselt gerade – beim nächsten Durchlauf erneut
@@ -233,6 +234,7 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
         float soft = TiltBus.soft();
         boolean home = homeFront();
         boolean open = unlocked();
+        logStatus(home, open, soft);
         if (PixelMode.shouldShow(now, soft, home, open, frame != null, frameTime, lastDisturb)) {
             show(soft, TiltBus.dark(), TiltBus.dirX(), TiltBus.dirY());
             return;
@@ -240,6 +242,19 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
         hide();
         if (!capturing && now - hiddenAt >= HIDE_SETTLE_MS
                 && PixelMode.shouldCapture(now, lastCapture, lastDisturb, soft, home, open, shown)) capture();
+    }
+
+    /** Zustand ins Protokoll (Tag KippStatus), nur bei Änderung – für Tests per adb logcat. */
+    private String lastStatus = "";
+
+    private void logStatus(boolean home, boolean open, float soft) {
+        String status = "vorne=" + frontPackage + " home=" + homePackage + " startbildschirm=" + home
+                + " hintergrund=" + TiltBus.wallpaperVisible() + " zoom=" + Math.round(TiltBus.wallpaperZoom() * 100)
+                + " entsperrt=" + open + " foto=" + (frame != null) + " kippen=" + (soft >= PixelMode.SHOW_SOFT ? "ja" : "nein");
+        if (!status.equals(lastStatus)) {
+            lastStatus = status;
+            Log.i("KippStatus", status);
+        }
     }
 
     private void capture() {
@@ -271,12 +286,14 @@ public final class PixelTiltService extends AccessibilityService implements Tilt
                     // Altes Foto nicht selbst freigeben: es kann noch im letzten gezeichneten Bild stecken (GC räumt es)
                     frame = bitmap;
                     frameTime = started;
+                    Log.i("KippStatus", "Foto " + bitmap.getWidth() + "x" + bitmap.getHeight());
                     view.setFrame(bitmap);
                     update();
                 }
 
                 @Override public void onFailure(int errorCode) {
-                    capturing = false; // z. B. zu schnell hintereinander – der nächste Durchlauf versucht es erneut
+                    capturing = false;
+                    Log.i("KippStatus", "Foto fehlgeschlagen, Code " + errorCode); // z. B. zu schnell hintereinander – der nächste Durchlauf versucht es erneut
                 }
             });
         } catch (RuntimeException e) {
