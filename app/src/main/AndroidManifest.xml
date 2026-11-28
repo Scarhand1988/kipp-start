@@ -13,6 +13,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- 0.45: Standard-Startbildschirm (z. B. Pixel-Launcher) erkennen; ohne das sieht Android-11+ nur Kipp-Start selbst -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.DIAL" />
         </intent>
